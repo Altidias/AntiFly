@@ -2,25 +2,18 @@
 
 ![LOGO](https://i.imgur.com/WQqocWS.png)
 
-Lightweight Paper + Fabric **flight-control plugin** by CevAPI.
+Lightweight Paper + Fabric flight-control plugin by CevAPI.
 
-AntiFly is **not a full anti-cheat**.  
-It exists for one purpose only: **to block flight and extreme movement exploits**.
-
-Only the following are checked:
-- Unauthorized flight
-- Excessive movement speed (ground, air, water)
-- Elytra speed, stall, and slowdown behavior (optional)
-- Vehicle flight while preserving normal mount behavior, downhill movement, and genuine falling
-
-Nothing else is monitored or restricted.  
-No combat checks. No scaffolding checks. No packet analysis. No behavior profiling.
-
-Designed specifically for **anarchy and semi-anarchy servers** that want to stop flight hacks without policing gameplay.
+AntiFly is not a full anti-cheat. It focuses on flight and movement abuse with layered checks:
+- server-authorized flight state
+- server-side ground/support truth
+- buffered air/hover/anti-kick suspicion
+- disciplined setbacks to last known valid support
+- Elytra-specific movement and boost sanity checks
 
 ## Platforms
 - Paper: 1.21.x
-- Fabric: 1.21.11 (mojmap, requires Fabric Loader 0.18.1 and Fabric API 0.141.1+1.21.11)
+- Fabric: 1.21.11 (Fabric Loader 0.18.1+, Fabric API 0.141.1+1.21.11)
 
 ## Build
 ```bash
@@ -28,77 +21,89 @@ Designed specifically for **anarchy and semi-anarchy servers** that want to stop
 ```
 
 Artifacts:
-- Paper: `paper/build/libs/AntiFly-paper-1.x.x.jar`
-- Fabric: `fabric/build/libs/AntiFly-fabric-1.x.x.jar`
+- `paper/build/libs/AntiFly-paper-<version>.jar`
+- `fabric/build/libs/AntiFly-fabric-<version>.jar`
 
 ## Install
-Paper:
-- Drop the Paper jar into `plugins/`
+- Paper: drop the Paper jar into `plugins/`
+- Fabric: drop the Fabric jar into `mods/`
 
-Fabric:
-- Drop the Fabric jar into `mods/`
+## Commands
+### Paper
+Requires op or `antifly.admin`.
 
-## Ops Commands
-These commands are available in-game. Requires op/admin.
+Core:
+- `/antifly enable`
+- `/antifly disable`
+- `/antifly status`
+- `/antifly help`
+- `/antifly exempt <player>`
+- `/antifly unexempt <player>`
+- `/antifly set`
+- `/antifly set <key>`
+- `/antifly set <key> <value>`
+- `/antifly reset <player>`
 
-- Paper: requires op or `antifly.admin`
-- Fabric: requires moderator-level command permission
-- Non-ops/non-admins cannot use or tab-complete AntiFly commands.
+Alerts:
+- `/antifly alerts <off|game|console|both>`
+- `game` alerts go to ops and users with `antifly.alerts`
 
-```
-/antifly enable
-/antifly disable
-/antifly status
-/antifly help
-/antifly exempt <player>
-/antifly unexempt <player>
-/antifly set airSpeed <value>
-/antifly set airVertical <value>
-/antifly set airNonFallTicks <value>
-/antifly set antiKickWindowTicks <value>
-/antifly set antiKickMinDescent <value>
-/antifly set waterSpeed <value>
-/antifly set waterVertical <value>
-/antifly set groundSpeedWalking <value>
-/antifly set groundSpeedMounted <value>
-/antifly set vehicleFallMinDescent <value>
-/antifly set vehicleFallMaxHorizontal <value>
-/antifly set vehicleFallTicksMax <value>
-/antifly set elytraEnabled <value>
-/antifly set elytraMaxHorizontal <value>
-/antifly set elytraMaxUp <value>
-/antifly set elytraMaxDown <value>
-/antifly set elytraStallHorizontalMax <value>
-/antifly set elytraStallVerticalMax <value>
-/antifly set elytraStallTicks <value>
-/antifly set elytraSlowdownMinSpeed <value>
-/antifly set elytraSlowdownMinScale <value>
-/antifly set elytraSlowdownGraceTicks <value>
-/antifly reset <player>
-```
+Debug:
+- `/antifly debug on`
+- `/antifly debug off`
+- `/antifly debug`
+- Shows live action-bar telemetry (mode, speed vs limits, key buffers)
 
-Notes:
-- `/antifly set` shows all current settings.
-- `/antifly set <key>` shows the current value for that key.
-- `/antifly unexempt <tab>` suggests only currently exempt players.
-- Default ground limits:
-  - `groundSpeedWalking=0.49`
-  - `groundSpeedMounted=0.750`
-- Vehicle fall tuning defaults:
-  - `vehicleFallMinDescent=-0.04`
-  - `vehicleFallMaxHorizontal=0.40`
-  - `vehicleFallTicksMax=60`
-- Legacy `groundSpeed` remains accepted as an alias of `groundSpeedWalking`.
-- Fence/wall top collisions are treated as valid ground support.
-- Horse and other mount jumps have extra vehicle-air grace before flight is blocked.
+### Fabric
+Requires moderator-level command permission.
+- `/antifly` command family is available with equivalent core controls.
 
-## Modrinth Version Check
-AntiFly can compare the running version against Modrinth project `antiflight` and alert ops/admins if the server is outdated.
+## Primary settings keys (Paper)
+- `groundWalkMax`
+- `groundMountedMax`
+- `waterMax`
+- `waterVerticalMax`
+- `maxAirHorizontal`
+- `maxAirVertical`
+- `bufferDecay`
+- `horizontalBufferLimit`
+- `verticalBufferLimit`
+- `hoverBufferLimit`
+- `noFallDetectionEnabled`
+- `airNonFallTicksLimit`
+- `antiKickWindowTicks`
+- `antiKickMinDescent`
+- `setbackCooldownMs`
+- `elytraEnabled`
+- `elytraBoostGraceTicks`
+- `elytraStallTicks`
+- `elytraMovementBufferLimit`
+- `elytraDurabilityCheckEnabled`
+- `elytraMaxRocketHorizontal`
+- `elytraMaxRocketUp`
+- `elytraNoRocketSustainableHorizontal`
+- `elytraMaxNoRocketUp`
 
-- API used: `https://api.modrinth.com/v2/project/<slug>/version?featured=true&include_changelog=false`
-- `/antifly status` performs a live check.
-- A startup check also runs and warns ops/admins when outdated.
+Legacy aliases kept for backward compatibility:
+- `groundSpeed`, `groundSpeedWalking`, `groundSpeedMounted`
+- `waterSpeed`, `waterVertical`
+- `airSpeed`, `airVertical`, `airNonFallTicks`
+- `elytraMovementLimit`
 
-## Config
+## Notes on Elytra
+- Rocket-assisted glide is tracked separately from no-rocket glide.
+- No-rocket controlled upward/flat cruise behavior is treated as suspicious and can be blocked.
+- Rare fluid-exit and early-glide pull-up transitions are given short grace windows to reduce false positives.
+
+## Permissions (Paper)
+- `antifly.admin` (default: op)
+- `antifly.alerts` (default: op)
+
+## Config locations
 - Paper: `plugins/AntiFly/config.yml`
 - Fabric: `config/antifly.json`
+
+## Modrinth version check
+- Project slug: `antiflight`
+- `/antifly status` performs a live check
+- Startup check warns ops/admins if outdated

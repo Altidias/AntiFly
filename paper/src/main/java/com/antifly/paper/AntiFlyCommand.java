@@ -9,39 +9,34 @@ import java.util.UUID;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.OfflinePlayer;
-import org.bukkit.entity.Player;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.entity.Player;
 
 public final class AntiFlyCommand implements CommandExecutor, TabCompleter {
-    private static final List<String> ROOT = List.of(
-        "help", "enable", "disable", "status", "exempt", "unexempt", "set", "reset"
-    );
+    private static final List<String> ROOT = List.of("help", "enable", "disable", "status", "alerts", "debug", "exempt", "unexempt", "set", "reset");
     private static final List<String> SET_KEYS = List.of(
-        "airSpeed",
-        "airVertical",
-        "airNonFallTicks",
-        "antiKickWindowTicks",
-        "antiKickMinDescent",
-        "waterSpeed",
-        "waterVertical",
-        "groundSpeedWalking",
-        "groundSpeedMounted",
-        "vehicleFallMinDescent",
-        "vehicleFallMaxHorizontal",
-        "vehicleFallTicksMax",
-        "elytraEnabled",
-        "elytraMaxHorizontal",
-        "elytraMaxUp",
-        "elytraMaxDown",
-        "elytraStallHorizontalMax",
-        "elytraStallVerticalMax",
-        "elytraStallTicks",
-        "elytraSlowdownMinSpeed",
-        "elytraSlowdownMinScale",
-        "elytraSlowdownGraceTicks"
+        "groundWalkMax", "groundMountedMax", "waterMax", "waterVerticalMax",
+        "maxAirHorizontal", "maxAirVertical", "bufferDecay", "horizontalBufferLimit", "verticalBufferLimit",
+        "hoverBufferLimit", "noFallDetectionEnabled", "airNonFallTicksLimit", "antiKickWindowTicks",
+        "antiKickMinDescent", "setbackCooldownMs", "elytraEnabled", "elytraBoostGraceTicks",
+        "elytraStallTicks", "elytraMovementBufferLimit", "elytraDurabilityCheckEnabled",
+        "elytraMaxRocketHorizontal", "elytraMaxRocketUp", "elytraNoRocketSustainableHorizontal", "elytraMaxNoRocketUp"
+    );
+    private static final List<String> SET_ALIASES = List.of(
+        "groundSpeed", "groundSpeedWalking", "groundSpeedMounted",
+        "waterSpeed", "waterVertical",
+        "airSpeed", "airVertical", "airNonFallTicks", "elytraMovementLimit",
+        "ground_walk_max", "ground_mounted_max", "water_max", "water_vertical_max",
+        "max_air_horizontal", "max_air_vertical", "buffer_decay", "horizontal_buffer_limit",
+        "vertical_buffer_limit", "hover_buffer_limit", "no_fall_detection_enabled",
+        "air_non_fall_ticks_limit", "anti_kick_window_ticks", "anti_kick_min_descent",
+        "setback_cooldown_ms", "elytra_enabled", "elytra_boost_grace_ticks",
+        "elytra_stall_ticks", "elytra_movement_buffer_limit", "elytra_durability_check_enabled",
+        "elytra_max_rocket_horizontal", "elytra_max_rocket_up",
+        "elytra_no_rocket_sustainable_horizontal", "elytra_max_no_rocket_up"
     );
 
     private final AntiFlyPlugin plugin;
@@ -57,41 +52,31 @@ public final class AntiFlyCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 0) {
-            sender.sendMessage(ChatColor.YELLOW + "Usage: /antifly <enable|disable|status|exempt|unexempt|set|reset>");
+            sender.sendMessage(ChatColor.GOLD + "AntiFly Commands");
+            sender.sendMessage(ChatColor.YELLOW + "  /antifly help");
+            sender.sendMessage(ChatColor.YELLOW + "  /antifly status");
+            sender.sendMessage(ChatColor.YELLOW + "  /antifly set <key> <value>");
             return true;
         }
 
         String sub = args[0].toLowerCase(Locale.ROOT);
         switch (sub) {
             case "help" -> {
-                sender.sendMessage(ChatColor.YELLOW + "/antifly enable");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly disable");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly status");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly exempt <player>");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly unexempt <player>");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly set airSpeed <value>");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly set airVertical <value>");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly set airNonFallTicks <value>");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly set antiKickWindowTicks <value>");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly set antiKickMinDescent <value>");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly set waterSpeed <value>");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly set waterVertical <value>");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly set groundSpeedWalking <value>");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly set groundSpeedMounted <value>");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly set vehicleFallMinDescent <value>");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly set vehicleFallMaxHorizontal <value>");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly set vehicleFallTicksMax <value>");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly set elytraEnabled <value>");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly set elytraMaxHorizontal <value>");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly set elytraMaxUp <value>");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly set elytraMaxDown <value>");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly set elytraStallHorizontalMax <value>");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly set elytraStallVerticalMax <value>");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly set elytraStallTicks <value>");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly set elytraSlowdownMinSpeed <value>");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly set elytraSlowdownMinScale <value>");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly set elytraSlowdownGraceTicks <value>");
-                sender.sendMessage(ChatColor.YELLOW + "/antifly reset <player>");
+                sender.sendMessage(ChatColor.GOLD + "AntiFly Help");
+                sender.sendMessage(ChatColor.AQUA + "Control");
+                sender.sendMessage(ChatColor.YELLOW + "  /antifly enable");
+                sender.sendMessage(ChatColor.YELLOW + "  /antifly disable");
+                sender.sendMessage(ChatColor.YELLOW + "  /antifly status");
+                sender.sendMessage(ChatColor.YELLOW + "  /antifly alerts <off|game|console|both>");
+                sender.sendMessage(ChatColor.AQUA + "Player");
+                sender.sendMessage(ChatColor.YELLOW + "  /antifly exempt <player>");
+                sender.sendMessage(ChatColor.YELLOW + "  /antifly unexempt <player>");
+                sender.sendMessage(ChatColor.YELLOW + "  /antifly reset <player>");
+                sender.sendMessage(ChatColor.AQUA + "Tuning");
+                sender.sendMessage(ChatColor.YELLOW + "  /antifly set");
+                sender.sendMessage(ChatColor.YELLOW + "  /antifly set <key>");
+                sender.sendMessage(ChatColor.YELLOW + "  /antifly set <key> <value>");
+                sender.sendMessage(ChatColor.DARK_GRAY + "Tip: use /antifly set to list all keys.");
                 return true;
             }
             case "enable" -> {
@@ -106,20 +91,82 @@ public final class AntiFlyCommand implements CommandExecutor, TabCompleter {
             }
             case "status" -> {
                 AntiFlyPlugin.Settings s = plugin.getSettings();
-                sender.sendMessage(ChatColor.AQUA + "AntiFly: " + (plugin.isAntiFlyEnabled() ? "enabled" : "disabled"));
-                sender.sendMessage(ChatColor.GRAY + "Limits: groundWalking=" + s.groundWalkMax
-                    + " groundMounted=" + s.groundMountedMax
-                    + " vehicleFallMinDescent=" + s.vehicleFallMinDescent
-                    + " vehicleFallMaxHorizontal=" + s.vehicleFallMaxHorizontal
-                    + " vehicleFallTicksMax=" + s.vehicleFallTicksMax
-                    + " air=" + s.airMax
-                    + " airVertical=" + s.airVerticalMax
-                    + " airNonFallTicks=" + s.airNonFallTicks
-                    + " antiKickWindowTicks=" + s.antiKickWindowTicks
-                    + " antiKickMinDescent=" + s.antiKickMinDescent
-                    + " water=" + s.waterMax
-                    + " waterVertical=" + s.waterVerticalMax);
+                sender.sendMessage(ChatColor.GOLD + "AntiFly Status");
+                sender.sendMessage(ChatColor.GRAY + "State: "
+                    + (plugin.isAntiFlyEnabled() ? ChatColor.GREEN + "ENABLED" : ChatColor.RED + "DISABLED"));
+
+                sender.sendMessage(ChatColor.AQUA + "Ground / Fluid");
+                sender.sendMessage(ChatColor.GRAY + "  groundWalkMax=" + ChatColor.WHITE + s.groundWalkMax
+                    + ChatColor.GRAY + "  groundMountedMax=" + ChatColor.WHITE + s.groundMountedMax);
+                sender.sendMessage(ChatColor.GRAY + "  waterMax=" + ChatColor.WHITE + s.waterMax
+                    + ChatColor.GRAY + "  waterVerticalMax=" + ChatColor.WHITE + s.waterVerticalMax);
+
+                sender.sendMessage(ChatColor.AQUA + "Air");
+                sender.sendMessage(ChatColor.GRAY + "  maxAirHorizontal=" + ChatColor.WHITE + s.maxAirHorizontal
+                    + ChatColor.GRAY + "  maxAirVertical=" + ChatColor.WHITE + s.maxAirVertical);
+                sender.sendMessage(ChatColor.GRAY + "  noFallDetectionEnabled=" + ChatColor.WHITE + s.noFallDetectionEnabled
+                    + ChatColor.GRAY + "  airNonFallTicksLimit=" + ChatColor.WHITE + s.airNonFallTicksLimit);
+                sender.sendMessage(ChatColor.GRAY + "  antiKickWindowTicks=" + ChatColor.WHITE + s.antiKickWindowTicks
+                    + ChatColor.GRAY + "  antiKickMinDescent=" + ChatColor.WHITE + s.antiKickMinDescent);
+
+                sender.sendMessage(ChatColor.AQUA + "Buffers / Setback");
+                sender.sendMessage(ChatColor.GRAY + "  bufferDecay=" + ChatColor.WHITE + s.bufferDecay
+                    + ChatColor.GRAY + "  horizontalBufferLimit=" + ChatColor.WHITE + s.horizontalBufferLimit);
+                sender.sendMessage(ChatColor.GRAY + "  verticalBufferLimit=" + ChatColor.WHITE + s.verticalBufferLimit
+                    + ChatColor.GRAY + "  hoverBufferLimit=" + ChatColor.WHITE + s.hoverBufferLimit);
+                sender.sendMessage(ChatColor.GRAY + "  setbackCooldownMs=" + ChatColor.WHITE + s.setbackCooldownMs
+                    + ChatColor.GRAY + "  alertMode=" + ChatColor.WHITE + s.alertMode.name().toLowerCase(Locale.ROOT));
+
+                sender.sendMessage(ChatColor.AQUA + "Elytra");
+                sender.sendMessage(ChatColor.GRAY + "  enabled=" + ChatColor.WHITE + s.elytraEnabled
+                    + ChatColor.GRAY + "  boostGraceTicks=" + ChatColor.WHITE + s.elytraBoostGraceTicks);
+                sender.sendMessage(ChatColor.GRAY + "  stallTicks=" + ChatColor.WHITE + s.elytraStallTicks
+                    + ChatColor.GRAY + "  movementBufferLimit=" + ChatColor.WHITE + s.elytraMovementBufferLimit);
+                sender.sendMessage(ChatColor.GRAY + "  durabilityCheckEnabled=" + ChatColor.WHITE + s.elytraDurabilityCheckEnabled);
+                sender.sendMessage(ChatColor.GRAY + "  maxRocketHorizontal=" + ChatColor.WHITE + s.elytraMaxRocketHorizontal
+                    + ChatColor.GRAY + "  maxRocketUp=" + ChatColor.WHITE + s.elytraMaxRocketUp);
+                sender.sendMessage(ChatColor.GRAY + "  noRocketSustainableHorizontal=" + ChatColor.WHITE + s.elytraNoRocketSustainableHorizontal
+                    + ChatColor.GRAY + "  maxNoRocketUp=" + ChatColor.WHITE + s.elytraMaxNoRocketUp);
                 plugin.checkModrinthVersion(sender);
+                return true;
+            }
+            case "alerts" -> {
+                if (args.length < 2) {
+                    sender.sendMessage(ChatColor.YELLOW + "Usage: /antifly alerts <off|game|console|both>");
+                    sender.sendMessage(ChatColor.GRAY + "Current: " + plugin.getSettings().alertMode.name().toLowerCase(Locale.ROOT));
+                    return true;
+                }
+                AntiFlyPlugin.AlertMode mode = AntiFlyPlugin.AlertMode.fromString(args[1], null);
+                if (mode == null) {
+                    sender.sendMessage(ChatColor.RED + "Invalid mode. Use: off, game, console, both");
+                    return true;
+                }
+                plugin.setAlertMode(mode);
+                sender.sendMessage(ChatColor.GREEN + "Alert mode set to " + mode.name().toLowerCase(Locale.ROOT));
+                return true;
+            }
+            case "debug" -> {
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage(ChatColor.YELLOW + "Usage: /antifly debug <on|off>");
+                    return true;
+                }
+                if (args.length < 2) {
+                    sender.sendMessage(ChatColor.YELLOW + "Debug is " + (plugin.isDebug(player) ? "on" : "off"));
+                    sender.sendMessage(ChatColor.YELLOW + "Usage: /antifly debug <on|off>");
+                    return true;
+                }
+                String mode = args[1].toLowerCase(Locale.ROOT);
+                if (mode.equals("on")) {
+                    plugin.setDebug(player, true);
+                    sender.sendMessage(ChatColor.GREEN + "AntiFly action-bar debug enabled.");
+                    return true;
+                }
+                if (mode.equals("off")) {
+                    plugin.setDebug(player, false);
+                    sender.sendMessage(ChatColor.RED + "AntiFly action-bar debug disabled.");
+                    return true;
+                }
+                sender.sendMessage(ChatColor.YELLOW + "Usage: /antifly debug <on|off>");
                 return true;
             }
             case "exempt" -> {
@@ -153,17 +200,14 @@ public final class AntiFlyCommand implements CommandExecutor, TabCompleter {
             case "set" -> {
                 if (args.length == 1) {
                     AntiFlyPlugin.Settings s = plugin.getSettings();
-                    sender.sendMessage(ChatColor.YELLOW + "AntiFly settings:");
+                    sender.sendMessage(ChatColor.GOLD + "AntiFly Settings Keys");
                     for (String key : SET_KEYS) {
-                        String value = formatSettingValue(s, key);
-                        if (value != null) {
-                            sender.sendMessage(ChatColor.GRAY + key + "=" + value);
-                        }
+                        sender.sendMessage(ChatColor.GRAY + "  " + key + ChatColor.DARK_GRAY + " = " + ChatColor.WHITE + formatSettingValue(s, key));
                     }
                     return true;
                 }
                 if (args.length == 2) {
-                    String key = args[1];
+                    String key = AntiFlyPlugin.normalizeSettingKey(args[1]);
                     String value = formatSettingValue(plugin.getSettings(), key);
                     if (value == null) {
                         sender.sendMessage(ChatColor.RED + "Unknown key.");
@@ -176,7 +220,7 @@ public final class AntiFlyCommand implements CommandExecutor, TabCompleter {
                     sender.sendMessage(ChatColor.YELLOW + "Usage: /antifly set <key> <value>");
                     return true;
                 }
-                String key = args[1];
+                String key = AntiFlyPlugin.normalizeSettingKey(args[1]);
                 double value;
                 try {
                     value = Double.parseDouble(args[2]);
@@ -223,8 +267,16 @@ public final class AntiFlyCommand implements CommandExecutor, TabCompleter {
             }
             return null;
         }
+        if (args.length == 2 && args[0].equalsIgnoreCase("debug")) {
+            return filter(List.of("on", "off"), args[1]);
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("alerts")) {
+            return filter(List.of("off", "game", "console", "both"), args[1]);
+        }
         if (args.length == 2 && args[0].equalsIgnoreCase("set")) {
-            return filter(SET_KEYS, args[1]);
+            List<String> allKeys = new ArrayList<>(SET_KEYS);
+            allKeys.addAll(SET_ALIASES);
+            return filter(allKeys, args[1]);
         }
         return List.of();
     }
@@ -266,28 +318,30 @@ public final class AntiFlyCommand implements CommandExecutor, TabCompleter {
 
     private String formatSettingValue(AntiFlyPlugin.Settings s, String key) {
         return switch (key) {
-            case "groundSpeed", "groundSpeedWalking" -> String.valueOf(s.groundWalkMax);
-            case "groundSpeedMounted" -> String.valueOf(s.groundMountedMax);
-            case "vehicleFallMinDescent" -> String.valueOf(s.vehicleFallMinDescent);
-            case "vehicleFallMaxHorizontal" -> String.valueOf(s.vehicleFallMaxHorizontal);
-            case "vehicleFallTicksMax" -> String.valueOf(s.vehicleFallTicksMax);
-            case "airSpeed" -> String.valueOf(s.airMax);
-            case "airVertical" -> String.valueOf(s.airVerticalMax);
-            case "airNonFallTicks" -> String.valueOf(s.airNonFallTicks);
+            case "groundWalkMax" -> String.valueOf(s.groundWalkMax);
+            case "groundMountedMax" -> String.valueOf(s.groundMountedMax);
+            case "waterMax" -> String.valueOf(s.waterMax);
+            case "waterVerticalMax" -> String.valueOf(s.waterVerticalMax);
+            case "maxAirHorizontal" -> String.valueOf(s.maxAirHorizontal);
+            case "maxAirVertical" -> String.valueOf(s.maxAirVertical);
+            case "bufferDecay" -> String.valueOf(s.bufferDecay);
+            case "horizontalBufferLimit" -> String.valueOf(s.horizontalBufferLimit);
+            case "verticalBufferLimit" -> String.valueOf(s.verticalBufferLimit);
+            case "hoverBufferLimit" -> String.valueOf(s.hoverBufferLimit);
+            case "noFallDetectionEnabled" -> String.valueOf(s.noFallDetectionEnabled);
+            case "airNonFallTicksLimit" -> String.valueOf(s.airNonFallTicksLimit);
             case "antiKickWindowTicks" -> String.valueOf(s.antiKickWindowTicks);
             case "antiKickMinDescent" -> String.valueOf(s.antiKickMinDescent);
-            case "waterSpeed" -> String.valueOf(s.waterMax);
-            case "waterVertical" -> String.valueOf(s.waterVerticalMax);
-            case "elytraEnabled" -> String.valueOf(s.elytraChecksEnabled);
-            case "elytraMaxHorizontal" -> String.valueOf(s.elytraMaxHorizontal);
-            case "elytraMaxUp" -> String.valueOf(s.elytraMaxUp);
-            case "elytraMaxDown" -> String.valueOf(s.elytraMaxDown);
-            case "elytraStallHorizontalMax" -> String.valueOf(s.elytraStallHorizontalMax);
-            case "elytraStallVerticalMax" -> String.valueOf(s.elytraStallVerticalMax);
+            case "setbackCooldownMs" -> String.valueOf(s.setbackCooldownMs);
+            case "elytraEnabled" -> String.valueOf(s.elytraEnabled);
+            case "elytraBoostGraceTicks" -> String.valueOf(s.elytraBoostGraceTicks);
             case "elytraStallTicks" -> String.valueOf(s.elytraStallTicks);
-            case "elytraSlowdownMinSpeed" -> String.valueOf(s.elytraSlowdownMinSpeed);
-            case "elytraSlowdownMinScale" -> String.valueOf(s.elytraSlowdownMinScale);
-            case "elytraSlowdownGraceTicks" -> String.valueOf(s.elytraSlowdownGraceTicks);
+            case "elytraMovementBufferLimit" -> String.valueOf(s.elytraMovementBufferLimit);
+            case "elytraDurabilityCheckEnabled" -> String.valueOf(s.elytraDurabilityCheckEnabled);
+            case "elytraMaxRocketHorizontal" -> String.valueOf(s.elytraMaxRocketHorizontal);
+            case "elytraMaxRocketUp" -> String.valueOf(s.elytraMaxRocketUp);
+            case "elytraNoRocketSustainableHorizontal" -> String.valueOf(s.elytraNoRocketSustainableHorizontal);
+            case "elytraMaxNoRocketUp" -> String.valueOf(s.elytraMaxNoRocketUp);
             default -> null;
         };
     }

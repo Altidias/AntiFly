@@ -1,7 +1,7 @@
 package com.antifly.paper;
 
-import com.antifly.common.AttemptTracker;
 import com.antifly.common.AntiFlyConstants;
+import com.antifly.common.AttemptTracker;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -16,6 +16,7 @@ public final class AntiFlyPlugin extends JavaPlugin {
     private final AttemptTracker attemptTracker = new AttemptTracker();
     private final Map<UUID, PlayerState> states = new ConcurrentHashMap<>();
     private final Set<UUID> exempt = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> debug = ConcurrentHashMap.newKeySet();
     private final Set<UUID> notifiedOutdatedOps = new HashSet<>();
     private final Settings settings = new Settings();
     private boolean antiFlyEnabled = true;
@@ -61,6 +62,18 @@ public final class AntiFlyPlugin extends JavaPlugin {
         return Set.copyOf(exempt);
     }
 
+    boolean isDebug(Player player) {
+        return debug.contains(player.getUniqueId());
+    }
+
+    void setDebug(Player player, boolean enabled) {
+        if (enabled) {
+            debug.add(player.getUniqueId());
+        } else {
+            debug.remove(player.getUniqueId());
+        }
+    }
+
     boolean canUseAdminCommands(org.bukkit.command.CommandSender sender) {
         return !(sender instanceof Player player) || player.isOp() || sender.hasPermission("antifly.admin");
     }
@@ -101,57 +114,36 @@ public final class AntiFlyPlugin extends JavaPlugin {
     }
 
     void updateSetting(String key, double value) {
-        FileConfiguration config = getConfig();
-        switch (key) {
-            case "groundSpeed", "groundSpeedWalking" -> settings.groundWalkMax = value;
-            case "groundSpeedMounted" -> settings.groundMountedMax = value;
-            case "vehicleFallMinDescent" -> settings.vehicleFallMinDescent = value;
-            case "vehicleFallMaxHorizontal" -> settings.vehicleFallMaxHorizontal = value;
-            case "vehicleFallTicksMax" -> settings.vehicleFallTicksMax = (int) Math.round(value);
-            case "airSpeed" -> settings.airMax = value;
-            case "airVertical" -> settings.airVerticalMax = value;
-            case "airNonFallTicks" -> settings.airNonFallTicks = (int) Math.round(value);
+        switch (normalizeSettingKey(key)) {
+            case "groundWalkMax" -> settings.groundWalkMax = value;
+            case "groundMountedMax" -> settings.groundMountedMax = value;
+            case "waterMax" -> settings.waterMax = value;
+            case "waterVerticalMax" -> settings.waterVerticalMax = value;
+            case "maxAirHorizontal" -> settings.maxAirHorizontal = value;
+            case "maxAirVertical" -> settings.maxAirVertical = value;
+            case "bufferDecay" -> settings.bufferDecay = value;
+            case "horizontalBufferLimit" -> settings.horizontalBufferLimit = value;
+            case "verticalBufferLimit" -> settings.verticalBufferLimit = value;
+            case "hoverBufferLimit" -> settings.hoverBufferLimit = value;
+            case "noFallDetectionEnabled" -> settings.noFallDetectionEnabled = value > 0.5;
+            case "airNonFallTicksLimit" -> settings.airNonFallTicksLimit = (int) Math.round(value);
             case "antiKickWindowTicks" -> settings.antiKickWindowTicks = (int) Math.round(value);
             case "antiKickMinDescent" -> settings.antiKickMinDescent = value;
-            case "waterSpeed" -> settings.waterMax = value;
-            case "waterVertical" -> settings.waterVerticalMax = value;
-            case "elytraEnabled" -> settings.elytraChecksEnabled = value > 0.5;
-            case "elytraMaxHorizontal" -> settings.elytraMaxHorizontal = value;
-            case "elytraMaxUp" -> settings.elytraMaxUp = value;
-            case "elytraMaxDown" -> settings.elytraMaxDown = value;
-            case "elytraStallHorizontalMax" -> settings.elytraStallHorizontalMax = value;
-            case "elytraStallVerticalMax" -> settings.elytraStallVerticalMax = value;
+            case "setbackCooldownMs" -> settings.setbackCooldownMs = (long) Math.round(value);
+            case "elytraEnabled" -> settings.elytraEnabled = value > 0.5;
+            case "elytraBoostGraceTicks" -> settings.elytraBoostGraceTicks = (int) Math.round(value);
             case "elytraStallTicks" -> settings.elytraStallTicks = (int) Math.round(value);
-            case "elytraSlowdownMinSpeed" -> settings.elytraSlowdownMinSpeed = value;
-            case "elytraSlowdownMinScale" -> settings.elytraSlowdownMinScale = value;
-            case "elytraSlowdownGraceTicks" -> settings.elytraSlowdownGraceTicks = (int) Math.round(value);
+            case "elytraMovementBufferLimit" -> settings.elytraMovementBufferLimit = value;
+            case "elytraDurabilityCheckEnabled" -> settings.elytraDurabilityCheckEnabled = value > 0.5;
+            case "elytraMaxRocketHorizontal" -> settings.elytraMaxRocketHorizontal = value;
+            case "elytraMaxRocketUp" -> settings.elytraMaxRocketUp = value;
+            case "elytraNoRocketSustainableHorizontal" -> settings.elytraNoRocketSustainableHorizontal = value;
+            case "elytraMaxNoRocketUp" -> settings.elytraMaxNoRocketUp = value;
             default -> {
                 return;
             }
         }
-        config.set("limits.ground", settings.groundWalkMax);
-        config.set("limits.groundWalking", settings.groundWalkMax);
-        config.set("limits.groundMounted", settings.groundMountedMax);
-        config.set("vehicle.fallMinDescent", settings.vehicleFallMinDescent);
-        config.set("vehicle.fallMaxHorizontal", settings.vehicleFallMaxHorizontal);
-        config.set("vehicle.fallTicksMax", settings.vehicleFallTicksMax);
-        config.set("limits.air", settings.airMax);
-        config.set("limits.airVertical", settings.airVerticalMax);
-        config.set("limits.airNonFallTicks", settings.airNonFallTicks);
-        config.set("limits.antiKickWindowTicks", settings.antiKickWindowTicks);
-        config.set("limits.antiKickMinDescent", settings.antiKickMinDescent);
-        config.set("limits.water", settings.waterMax);
-        config.set("limits.waterVertical", settings.waterVerticalMax);
-        config.set("elytra.enabled", settings.elytraChecksEnabled);
-        config.set("elytra.maxHorizontal", settings.elytraMaxHorizontal);
-        config.set("elytra.maxUp", settings.elytraMaxUp);
-        config.set("elytra.maxDown", settings.elytraMaxDown);
-        config.set("elytra.stallHorizontalMax", settings.elytraStallHorizontalMax);
-        config.set("elytra.stallVerticalMax", settings.elytraStallVerticalMax);
-        config.set("elytra.stallTicks", settings.elytraStallTicks);
-        config.set("elytra.slowdownMinSpeed", settings.elytraSlowdownMinSpeed);
-        config.set("elytra.slowdownMinScale", settings.elytraSlowdownMinScale);
-        config.set("elytra.slowdownGraceTicks", settings.elytraSlowdownGraceTicks);
+        writeSettingsToConfig(getConfig());
         saveConfig();
     }
 
@@ -162,58 +154,104 @@ public final class AntiFlyPlugin extends JavaPlugin {
     private void loadConfigValues() {
         FileConfiguration config = getConfig();
         config.addDefault("enabled", true);
-        config.addDefault("limits.ground", AntiFlyConstants.DEFAULT_GROUND_WALK_MAX);
+
+        config.addDefault("antiFly.airGraceTicks", 4);
+        config.addDefault("antiFly.maxAirHorizontal", AntiFlyConstants.DEFAULT_AIR_MAX);
+        config.addDefault("antiFly.maxAirVertical", AntiFlyConstants.DEFAULT_AIR_VERTICAL_MAX);
+        config.addDefault("antiFly.hoverStartTicks", 12);
+        config.addDefault("antiFly.hoverTicksLimit", 6);
+        config.addDefault("antiFly.hoverDeltaY", 0.001);
+        config.addDefault("antiFly.hoverHorizontal", 0.03);
+        config.addDefault("antiFly.airNonFallTicksLimit", 20);
+        config.addDefault("antiFly.antiKickWindowTicks", 40);
+        config.addDefault("antiFly.antiKickMinDescent", 0.35);
+        config.addDefault("antiFly.horizontalBufferLimit", 3.0);
+        config.addDefault("antiFly.verticalBufferLimit", 2.0);
+        config.addDefault("antiFly.hoverBufferLimit", 3.0);
+        config.addDefault("antiFly.bufferDecay", 0.25);
+        config.addDefault("antiFly.setbackCooldownMs", 500L);
+        config.addDefault("antiFly.noFallDetectionEnabled", true);
+        config.addDefault("antiFly.alertMode", "both");
+
+        config.addDefault("elytra.enabled", true);
+        config.addDefault("elytra.boostGraceTicks", 80);
+        config.addDefault("elytra.toggleGraceTicks", 10);
+        config.addDefault("elytra.landingGraceTicks", 8);
+        config.addDefault("elytra.stallHorizontalMax", 0.05);
+        config.addDefault("elytra.stallVerticalMax", 0.05);
+        config.addDefault("elytra.stallTicks", 10);
+        config.addDefault("elytra.noRocketWindowTicks", 40);
+        config.addDefault("elytra.noRocketMinDescent", 0.60);
+        config.addDefault("elytra.noRocketSustainableHorizontal", 1.20);
+        config.addDefault("elytra.noRocketMaxAscent", 0.80);
+        config.addDefault("elytra.maxNoRocketUp", 0.45);
+        config.addDefault("elytra.maxRocketHorizontal", 3.50);
+        config.addDefault("elytra.maxRocketUp", 1.50);
+        config.addDefault("elytra.requiredDescentForPullup", 0.75);
+        config.addDefault("elytra.movementBufferLimit", 6.0);
+        config.addDefault("elytra.durabilityCheckEnabled", true);
+        config.addDefault("elytra.durabilityBaseWindowTicks", 80);
+        config.addDefault("elytra.durabilityUnbreakingMultiplier", 2.5);
+        config.addDefault("elytra.durabilitySuspicionLimit", 3);
+        config.addDefault("elytra.requireMovementSuspicionForDurabilityPunish", true);
+
         config.addDefault("limits.groundWalking", AntiFlyConstants.DEFAULT_GROUND_WALK_MAX);
         config.addDefault("limits.groundMounted", AntiFlyConstants.DEFAULT_GROUND_MOUNT_MAX);
-        config.addDefault("vehicle.fallMinDescent", AntiFlyConstants.VEHICLE_FALL_MIN_DESCENT);
-        config.addDefault("vehicle.fallMaxHorizontal", AntiFlyConstants.VEHICLE_FALL_MAX_HORIZONTAL);
-        config.addDefault("vehicle.fallTicksMax", AntiFlyConstants.VEHICLE_FALL_TICKS_MAX);
-        config.addDefault("limits.air", AntiFlyConstants.DEFAULT_AIR_MAX);
-        config.addDefault("limits.airVertical", AntiFlyConstants.DEFAULT_AIR_VERTICAL_MAX);
-        config.addDefault("limits.airNonFallTicks", AntiFlyConstants.AIR_NON_FALL_TICKS);
-        config.addDefault("limits.antiKickWindowTicks", AntiFlyConstants.ANTI_KICK_WINDOW_TICKS);
-        config.addDefault("limits.antiKickMinDescent", AntiFlyConstants.ANTI_KICK_MIN_DESCENT);
         config.addDefault("limits.water", AntiFlyConstants.DEFAULT_WATER_MAX);
         config.addDefault("limits.waterVertical", AntiFlyConstants.DEFAULT_WATER_VERTICAL_MAX);
-        config.addDefault("elytra.enabled", true);
-        config.addDefault("elytra.maxHorizontal", AntiFlyConstants.ELYTRA_MAX_HORIZONTAL);
-        config.addDefault("elytra.maxUp", AntiFlyConstants.ELYTRA_MAX_UP);
-        config.addDefault("elytra.maxDown", AntiFlyConstants.ELYTRA_MAX_DOWN);
-        config.addDefault("elytra.stallHorizontalMax", AntiFlyConstants.ELYTRA_STALL_HORIZONTAL_MAX);
-        config.addDefault("elytra.stallVerticalMax", AntiFlyConstants.ELYTRA_STALL_VERTICAL_MAX);
-        config.addDefault("elytra.stallTicks", AntiFlyConstants.ELYTRA_STALL_TICKS);
-        config.addDefault("elytra.slowdownMinSpeed", AntiFlyConstants.ELYTRA_SLOWDOWN_MIN_SPEED);
-        config.addDefault("elytra.slowdownMinScale", AntiFlyConstants.ELYTRA_SLOWDOWN_MIN_SCALE);
-        config.addDefault("elytra.slowdownGraceTicks", AntiFlyConstants.ELYTRA_SLOWDOWN_GRACE_TICKS);
+
         config.addDefault("modrinth.projectSlug", "antiflight");
         config.addDefault("exempt", java.util.List.of());
         config.options().copyDefaults(true);
         saveConfig();
 
         antiFlyEnabled = config.getBoolean("enabled", true);
-        settings.groundWalkMax = config.getDouble("limits.groundWalking",
-            config.getDouble("limits.ground", AntiFlyConstants.DEFAULT_GROUND_WALK_MAX));
+
+        settings.groundWalkMax = config.getDouble("limits.groundWalking", AntiFlyConstants.DEFAULT_GROUND_WALK_MAX);
         settings.groundMountedMax = config.getDouble("limits.groundMounted", AntiFlyConstants.DEFAULT_GROUND_MOUNT_MAX);
-        settings.vehicleFallMinDescent = config.getDouble("vehicle.fallMinDescent", AntiFlyConstants.VEHICLE_FALL_MIN_DESCENT);
-        settings.vehicleFallMaxHorizontal = config.getDouble("vehicle.fallMaxHorizontal", AntiFlyConstants.VEHICLE_FALL_MAX_HORIZONTAL);
-        settings.vehicleFallTicksMax = config.getInt("vehicle.fallTicksMax", AntiFlyConstants.VEHICLE_FALL_TICKS_MAX);
-        settings.airMax = config.getDouble("limits.air", AntiFlyConstants.DEFAULT_AIR_MAX);
-        settings.airVerticalMax = config.getDouble("limits.airVertical", AntiFlyConstants.DEFAULT_AIR_VERTICAL_MAX);
-        settings.airNonFallTicks = config.getInt("limits.airNonFallTicks", AntiFlyConstants.AIR_NON_FALL_TICKS);
-        settings.antiKickWindowTicks = config.getInt("limits.antiKickWindowTicks", AntiFlyConstants.ANTI_KICK_WINDOW_TICKS);
-        settings.antiKickMinDescent = config.getDouble("limits.antiKickMinDescent", AntiFlyConstants.ANTI_KICK_MIN_DESCENT);
         settings.waterMax = config.getDouble("limits.water", AntiFlyConstants.DEFAULT_WATER_MAX);
         settings.waterVerticalMax = config.getDouble("limits.waterVertical", AntiFlyConstants.DEFAULT_WATER_VERTICAL_MAX);
-        settings.elytraChecksEnabled = config.getBoolean("elytra.enabled", true);
-        settings.elytraMaxHorizontal = config.getDouble("elytra.maxHorizontal", AntiFlyConstants.ELYTRA_MAX_HORIZONTAL);
-        settings.elytraMaxUp = config.getDouble("elytra.maxUp", AntiFlyConstants.ELYTRA_MAX_UP);
-        settings.elytraMaxDown = config.getDouble("elytra.maxDown", AntiFlyConstants.ELYTRA_MAX_DOWN);
-        settings.elytraStallHorizontalMax = config.getDouble("elytra.stallHorizontalMax", AntiFlyConstants.ELYTRA_STALL_HORIZONTAL_MAX);
-        settings.elytraStallVerticalMax = config.getDouble("elytra.stallVerticalMax", AntiFlyConstants.ELYTRA_STALL_VERTICAL_MAX);
-        settings.elytraStallTicks = config.getInt("elytra.stallTicks", AntiFlyConstants.ELYTRA_STALL_TICKS);
-        settings.elytraSlowdownMinSpeed = config.getDouble("elytra.slowdownMinSpeed", AntiFlyConstants.ELYTRA_SLOWDOWN_MIN_SPEED);
-        settings.elytraSlowdownMinScale = config.getDouble("elytra.slowdownMinScale", AntiFlyConstants.ELYTRA_SLOWDOWN_MIN_SCALE);
-        settings.elytraSlowdownGraceTicks = config.getInt("elytra.slowdownGraceTicks", AntiFlyConstants.ELYTRA_SLOWDOWN_GRACE_TICKS);
+
+        settings.airGraceTicks = config.getInt("antiFly.airGraceTicks", 4);
+        settings.maxAirHorizontal = config.getDouble("antiFly.maxAirHorizontal", AntiFlyConstants.DEFAULT_AIR_MAX);
+        settings.maxAirVertical = config.getDouble("antiFly.maxAirVertical", AntiFlyConstants.DEFAULT_AIR_VERTICAL_MAX);
+        settings.hoverStartTicks = config.getInt("antiFly.hoverStartTicks", 12);
+        settings.hoverTicksLimit = config.getInt("antiFly.hoverTicksLimit", 6);
+        settings.hoverDeltaY = config.getDouble("antiFly.hoverDeltaY", 0.001);
+        settings.hoverHorizontal = config.getDouble("antiFly.hoverHorizontal", 0.03);
+        settings.airNonFallTicksLimit = config.getInt("antiFly.airNonFallTicksLimit", 20);
+        settings.antiKickWindowTicks = config.getInt("antiFly.antiKickWindowTicks", 40);
+        settings.antiKickMinDescent = config.getDouble("antiFly.antiKickMinDescent", 0.35);
+        settings.horizontalBufferLimit = config.getDouble("antiFly.horizontalBufferLimit", 3.0);
+        settings.verticalBufferLimit = config.getDouble("antiFly.verticalBufferLimit", 2.0);
+        settings.hoverBufferLimit = config.getDouble("antiFly.hoverBufferLimit", 3.0);
+        settings.bufferDecay = config.getDouble("antiFly.bufferDecay", 0.25);
+        settings.setbackCooldownMs = config.getLong("antiFly.setbackCooldownMs", 500L);
+        settings.noFallDetectionEnabled = config.getBoolean("antiFly.noFallDetectionEnabled", true);
+        settings.alertMode = AlertMode.fromString(config.getString("antiFly.alertMode", "both"), AlertMode.BOTH);
+
+        settings.elytraEnabled = config.getBoolean("elytra.enabled", true);
+        settings.elytraBoostGraceTicks = config.getInt("elytra.boostGraceTicks", 80);
+        settings.elytraToggleGraceTicks = config.getInt("elytra.toggleGraceTicks", 10);
+        settings.elytraLandingGraceTicks = config.getInt("elytra.landingGraceTicks", 8);
+        settings.elytraStallHorizontalMax = config.getDouble("elytra.stallHorizontalMax", 0.05);
+        settings.elytraStallVerticalMax = config.getDouble("elytra.stallVerticalMax", 0.05);
+        settings.elytraStallTicks = config.getInt("elytra.stallTicks", 10);
+        settings.elytraNoRocketWindowTicks = config.getInt("elytra.noRocketWindowTicks", 40);
+        settings.elytraNoRocketMinDescent = config.getDouble("elytra.noRocketMinDescent", 0.60);
+        settings.elytraNoRocketSustainableHorizontal = config.getDouble("elytra.noRocketSustainableHorizontal", 1.20);
+        settings.elytraNoRocketMaxAscent = config.getDouble("elytra.noRocketMaxAscent", 0.80);
+        settings.elytraMaxNoRocketUp = config.getDouble("elytra.maxNoRocketUp", 0.45);
+        settings.elytraMaxRocketHorizontal = config.getDouble("elytra.maxRocketHorizontal", 3.50);
+        settings.elytraMaxRocketUp = config.getDouble("elytra.maxRocketUp", 1.50);
+        settings.elytraRequiredDescentForPullup = config.getDouble("elytra.requiredDescentForPullup", 0.75);
+        settings.elytraMovementBufferLimit = config.getDouble("elytra.movementBufferLimit", 6.0);
+        settings.elytraDurabilityCheckEnabled = config.getBoolean("elytra.durabilityCheckEnabled", true);
+        settings.elytraDurabilityBaseWindowTicks = config.getInt("elytra.durabilityBaseWindowTicks", 80);
+        settings.elytraDurabilityUnbreakingMultiplier = config.getDouble("elytra.durabilityUnbreakingMultiplier", 2.5);
+        settings.elytraDurabilitySuspicionLimit = config.getInt("elytra.durabilitySuspicionLimit", 3);
+        settings.elytraRequireMovementSuspicionForDurabilityPunish = config.getBoolean("elytra.requireMovementSuspicionForDurabilityPunish", true);
+
         settings.modrinthProjectSlug = config.getString("modrinth.projectSlug", "antiflight");
 
         exempt.clear();
@@ -224,6 +262,73 @@ public final class AntiFlyPlugin extends JavaPlugin {
                 getLogger().warning("Invalid exempt UUID: " + entry);
             }
         }
+    }
+
+    private void writeSettingsToConfig(FileConfiguration config) {
+        config.set("limits.groundWalking", settings.groundWalkMax);
+        config.set("limits.groundMounted", settings.groundMountedMax);
+        config.set("limits.water", settings.waterMax);
+        config.set("limits.waterVertical", settings.waterVerticalMax);
+
+        config.set("antiFly.maxAirHorizontal", settings.maxAirHorizontal);
+        config.set("antiFly.maxAirVertical", settings.maxAirVertical);
+        config.set("antiFly.bufferDecay", settings.bufferDecay);
+        config.set("antiFly.horizontalBufferLimit", settings.horizontalBufferLimit);
+        config.set("antiFly.verticalBufferLimit", settings.verticalBufferLimit);
+        config.set("antiFly.hoverBufferLimit", settings.hoverBufferLimit);
+        config.set("antiFly.noFallDetectionEnabled", settings.noFallDetectionEnabled);
+        config.set("antiFly.airNonFallTicksLimit", settings.airNonFallTicksLimit);
+        config.set("antiFly.antiKickWindowTicks", settings.antiKickWindowTicks);
+        config.set("antiFly.antiKickMinDescent", settings.antiKickMinDescent);
+        config.set("antiFly.setbackCooldownMs", settings.setbackCooldownMs);
+
+        config.set("elytra.enabled", settings.elytraEnabled);
+        config.set("elytra.boostGraceTicks", settings.elytraBoostGraceTicks);
+        config.set("elytra.stallTicks", settings.elytraStallTicks);
+        config.set("elytra.movementBufferLimit", settings.elytraMovementBufferLimit);
+        config.set("elytra.durabilityCheckEnabled", settings.elytraDurabilityCheckEnabled);
+        config.set("elytra.maxRocketHorizontal", settings.elytraMaxRocketHorizontal);
+        config.set("elytra.maxRocketUp", settings.elytraMaxRocketUp);
+        config.set("elytra.noRocketSustainableHorizontal", settings.elytraNoRocketSustainableHorizontal);
+        config.set("elytra.maxNoRocketUp", settings.elytraMaxNoRocketUp);
+    }
+
+    static String normalizeSettingKey(String key) {
+        return switch (key) {
+            case "airSpeed", "maxAirHorizontal" -> "maxAirHorizontal";
+            case "airVertical", "maxAirVertical" -> "maxAirVertical";
+            case "airNonFallTicks", "airNonFallTicksLimit" -> "airNonFallTicksLimit";
+            case "elytraMovementLimit", "elytraMovementBufferLimit" -> "elytraMovementBufferLimit";
+            case "groundSpeed", "groundSpeedWalking", "groundWalkMax" -> "groundWalkMax";
+            case "groundSpeedMounted", "groundMountedMax" -> "groundMountedMax";
+            case "waterSpeed", "waterMax" -> "waterMax";
+            case "waterVertical", "waterVerticalMax" -> "waterVerticalMax";
+            case "ground_walk_max" -> "groundWalkMax";
+            case "ground_mounted_max" -> "groundMountedMax";
+            case "water_max" -> "waterMax";
+            case "water_vertical_max" -> "waterVerticalMax";
+            case "max_air_horizontal" -> "maxAirHorizontal";
+            case "max_air_vertical" -> "maxAirVertical";
+            case "buffer_decay" -> "bufferDecay";
+            case "horizontal_buffer_limit" -> "horizontalBufferLimit";
+            case "vertical_buffer_limit" -> "verticalBufferLimit";
+            case "hover_buffer_limit" -> "hoverBufferLimit";
+            case "no_fall_detection_enabled" -> "noFallDetectionEnabled";
+            case "air_non_fall_ticks_limit" -> "airNonFallTicksLimit";
+            case "anti_kick_window_ticks" -> "antiKickWindowTicks";
+            case "anti_kick_min_descent" -> "antiKickMinDescent";
+            case "setback_cooldown_ms" -> "setbackCooldownMs";
+            case "elytra_enabled" -> "elytraEnabled";
+            case "elytra_boost_grace_ticks" -> "elytraBoostGraceTicks";
+            case "elytra_stall_ticks" -> "elytraStallTicks";
+            case "elytra_movement_buffer_limit" -> "elytraMovementBufferLimit";
+            case "elytra_durability_check_enabled" -> "elytraDurabilityCheckEnabled";
+            case "elytra_max_rocket_horizontal" -> "elytraMaxRocketHorizontal";
+            case "elytra_max_rocket_up" -> "elytraMaxRocketUp";
+            case "elytra_no_rocket_sustainable_horizontal" -> "elytraNoRocketSustainableHorizontal";
+            case "elytra_max_no_rocket_up" -> "elytraMaxNoRocketUp";
+            default -> key;
+        };
     }
 
     private void persistExempt() {
@@ -257,51 +362,133 @@ public final class AntiFlyPlugin extends JavaPlugin {
     static final class Settings {
         double groundWalkMax;
         double groundMountedMax;
-        double vehicleFallMinDescent;
-        double vehicleFallMaxHorizontal;
-        int vehicleFallTicksMax;
-        double airMax;
-        double airVerticalMax;
-        int airNonFallTicks;
-        int antiKickWindowTicks;
-        double antiKickMinDescent;
         double waterMax;
         double waterVerticalMax;
-        boolean elytraChecksEnabled;
-        double elytraMaxHorizontal;
-        double elytraMaxUp;
-        double elytraMaxDown;
+
+        int airGraceTicks;
+        double maxAirHorizontal;
+        double maxAirVertical;
+        int hoverStartTicks;
+        int hoverTicksLimit;
+        double hoverDeltaY;
+        double hoverHorizontal;
+        int airNonFallTicksLimit;
+        int antiKickWindowTicks;
+        double antiKickMinDescent;
+        double horizontalBufferLimit;
+        double verticalBufferLimit;
+        double hoverBufferLimit;
+        double bufferDecay;
+        long setbackCooldownMs;
+        boolean noFallDetectionEnabled;
+        AlertMode alertMode;
+
+        boolean elytraEnabled;
+        int elytraBoostGraceTicks;
+        int elytraToggleGraceTicks;
+        int elytraLandingGraceTicks;
         double elytraStallHorizontalMax;
         double elytraStallVerticalMax;
         int elytraStallTicks;
-        double elytraSlowdownMinSpeed;
-        double elytraSlowdownMinScale;
-        int elytraSlowdownGraceTicks;
+        int elytraNoRocketWindowTicks;
+        double elytraNoRocketMinDescent;
+        double elytraNoRocketSustainableHorizontal;
+        double elytraNoRocketMaxAscent;
+        double elytraMaxNoRocketUp;
+        double elytraMaxRocketHorizontal;
+        double elytraMaxRocketUp;
+        double elytraRequiredDescentForPullup;
+        double elytraMovementBufferLimit;
+        boolean elytraDurabilityCheckEnabled;
+        int elytraDurabilityBaseWindowTicks;
+        double elytraDurabilityUnbreakingMultiplier;
+        int elytraDurabilitySuspicionLimit;
+        boolean elytraRequireMovementSuspicionForDurabilityPunish;
+
         String modrinthProjectSlug;
+    }
+
+    enum AlertMode {
+        OFF,
+        GAME,
+        CONSOLE,
+        BOTH;
+
+        static AlertMode fromString(String value, AlertMode fallback) {
+            if (value == null) {
+                return fallback;
+            }
+            return switch (value.trim().toLowerCase(java.util.Locale.ROOT)) {
+                case "off" -> OFF;
+                case "game", "ingame", "in-game" -> GAME;
+                case "console" -> CONSOLE;
+                case "both", "all" -> BOTH;
+                default -> fallback;
+            };
+        }
+    }
+
+    void setAlertMode(AlertMode mode) {
+        settings.alertMode = mode;
+        FileConfiguration config = getConfig();
+        config.set("antiFly.alertMode", mode.name().toLowerCase(java.util.Locale.ROOT));
+        saveConfig();
     }
 
     static final class PlayerState {
         org.bukkit.Location lastGround;
         org.bukkit.Location lastSupport;
         org.bukkit.Location lastPos;
+
+        boolean serverAllowedFlight;
+        long lastAllowFlightChangeMs;
+        int flightRevokeGraceTicks;
+
+        boolean lastServerOnGround;
+        boolean lastClientOnGround;
+        int groundSpoofTicks;
+
+        double airHorizontalBuffer;
+        double airVerticalBuffer;
+        double hoverBuffer;
+        double antiKickBuffer;
+        double groundSpoofBuffer;
+        double elytraBuffer;
+
         int airTicks;
         int airNonFallTicks;
-        int airSessionTicks;
-        double airSessionDescent;
         int hoverTicks;
-        int voidTicks;
-        int glideStallTicks;
-        int groundSpoofTicks;
-        int glideGroundGraceTicks;
-        int glideSlowdownGraceTicks;
-        double lastGlideHorizontal;
+        int antiKickWindowTicks;
+        double airWindowDescent;
+        double airWindowAscent;
+
         boolean wasGliding;
-        boolean lastServerOnGround;
-        int vehicleGraceTicks;
-        int vehicleAirTicks;
-        int vehicleFallTicks;
-        double vehicleFallHorizontalDistance;
-        boolean wasInVehicle;
+        int glideTicks;
+        int glideToggleGraceTicks;
+        int glideLandingGraceTicks;
+        int fluidExitGraceTicks;
+        int glideHoverTicks;
+        int glideControlTicks;
+        int glideStallTicks;
+        int glideNoRocketWindowTicks;
+        int lastRocketTick;
+        long lastRocketUseMs;
+        double glideWindowHorizontal;
+        double glideWindowDescent;
+        double glideWindowAscent;
+        double lastGlideHorizontal;
+        double peakGlideHorizontal;
+        double elytraMovementBuffer;
+
+        int lastElytraDurability = -1;
+        int elytraDurabilityTicks;
+        int elytraNoDurabilityDropWindows;
+        int lastElytraDurabilityDropTick;
+        boolean durabilitySuspicious;
+
+        int tick;
+        boolean lastInFluid;
+        long lastSetbackAtMs;
         long lastRubberBandAtMs;
     }
 }

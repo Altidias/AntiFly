@@ -5,9 +5,12 @@ api-version: '1.21'
 commands:
   antifly:
     description: AntiFly administration
-    usage: /antifly <help|enable|disable|status|exempt|unexempt|set|reset>
+    usage: /antifly <help|enable|disable|status|alerts|debug|exempt|unexempt|set|reset>
     permission: antifly.admin
 permissions:
   antifly.admin:
     description: Allows managing AntiFly
+    default: op
+  antifly.alerts:
+    description: Receives AntiFly in-game violation alerts
     default: op
