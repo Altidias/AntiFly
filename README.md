@@ -12,8 +12,8 @@ AntiFly is not a full anti-cheat. It focuses on flight and movement abuse with l
 - Elytra-specific movement and boost sanity checks
 
 ## Platforms
-- Paper: 1.21.x
-- Fabric: 1.21.11 (Fabric Loader 0.18.1+, Fabric API 0.141.1+1.21.11)
+- Paper: 1.21.x -> 26.1.2
+- Fabric: 1.21.11 -> 26.1.2 (Fabric Loader 0.18.1+, Fabric API 0.141.1+1.21.11)
 
 ## Build
 ```bash

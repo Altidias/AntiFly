@@ -69,6 +69,7 @@ public final class AntiFlyFabric implements ModInitializer {
     private final AttemptTracker attemptTracker = new AttemptTracker();
     private final Map<UUID, PlayerState> states = new ConcurrentHashMap<>();
     private final Set<UUID> exempt = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> debug = ConcurrentHashMap.newKeySet();
     private final AntiFlyConfig config = AntiFlyConfig.load();
 
     @Override
@@ -95,6 +96,7 @@ public final class AntiFlyFabric implements ModInitializer {
             UUID uuid = handler.getPlayer().getUUID();
             states.remove(uuid);
             attemptTracker.reset(uuid);
+            debug.remove(uuid);
         });
 
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
@@ -104,6 +106,8 @@ public final class AntiFlyFabric implements ModInitializer {
                     ctx.getSource().sendSuccess(() -> Component.literal("/antifly enable"), false);
                     ctx.getSource().sendSuccess(() -> Component.literal("/antifly disable"), false);
                     ctx.getSource().sendSuccess(() -> Component.literal("/antifly status"), false);
+                    ctx.getSource().sendSuccess(() -> Component.literal("/antifly alerts <off|game|console|both>"), false);
+                    ctx.getSource().sendSuccess(() -> Component.literal("/antifly debug <on|off>"), false);
                     ctx.getSource().sendSuccess(() -> Component.literal("/antifly exempt <player>"), false);
                     ctx.getSource().sendSuccess(() -> Component.literal("/antifly unexempt <player>"), false);
                     ctx.getSource().sendSuccess(() -> Component.literal("/antifly set <key> <value>"), false);
@@ -157,6 +161,19 @@ public final class AntiFlyFabric implements ModInitializer {
                     .then(Commands.literal("both").executes(ctx -> setAlertMode(ctx.getSource(), "both")))
                     .executes(ctx -> {
                         ctx.getSource().sendSuccess(() -> Component.literal("Usage: /antifly alerts <off|game|console|both> (current=" + config.alertMode + ")"), false);
+                        return 1;
+                    }))
+                .then(Commands.literal("debug")
+                    .then(Commands.literal("on").executes(ctx -> setDebugMode(ctx.getSource(), true)))
+                    .then(Commands.literal("off").executes(ctx -> setDebugMode(ctx.getSource(), false)))
+                    .executes(ctx -> {
+                        ServerPlayer player = ctx.getSource().getPlayer();
+                        if (player == null) {
+                            ctx.getSource().sendFailure(Component.literal("Usage: /antifly debug <on|off>"));
+                            return 0;
+                        }
+                        ctx.getSource().sendSuccess(() -> Component.literal("Debug is " + (isDebug(player) ? "on" : "off")), false);
+                        ctx.getSource().sendSuccess(() -> Component.literal("Usage: /antifly debug <on|off>"), false);
                         return 1;
                     }))
                 .then(Commands.literal("exempt")
@@ -383,6 +400,7 @@ public final class AntiFlyFabric implements ModInitializer {
                 if (deltaY > 0.02 || vel.y > 0.05) {
                     maxAllowed *= 1.5;
                 }
+                sendDebugActionBar(player, state, "GROUND", horizontal, deltaY, maxAllowed, 0.0);
                 if (state.glideGroundGraceTicks <= 0 && horizontal > maxAllowed) {
                     Vec3 target = state.lastGroundPos != null ? state.lastGroundPos : pos;
                     rubberBand(player, state, target, "ground_speed", horizontal, maxAllowed);
@@ -401,6 +419,7 @@ public final class AntiFlyFabric implements ModInitializer {
             double deltaY = state.lastPos != null ? (pos.y - state.lastPos.y) : 0.0;
             deltaY = Math.max(deltaY, vel.y);
             double maxUp = maxWaterVertical(player);
+            sendDebugActionBar(player, state, "FLUID", horizontal, deltaY, maxAllowed, maxUp);
             if (horizontal > maxAllowed) {
                 Vec3 target = state.lastSupportPos != null ? state.lastSupportPos : pos;
                 rubberBand(player, state, target, "water_speed", horizontal, maxAllowed);
@@ -419,10 +438,11 @@ public final class AntiFlyFabric implements ModInitializer {
         } else if (!inFluid) {
             state.airTicks++;
             boolean graceAir = state.airTicks <= 4;
+            double horizontal = 0.0;
+            double maxAllowed = maxAirSpeed(player);
             if (state.lastPos != null) {
                 Vec3 vel = player.getDeltaMovement();
-                double horizontal = Math.max(horizontalDistance(state.lastPos, pos), Math.sqrt(vel.x * vel.x + vel.z * vel.z));
-                double maxAllowed = maxAirSpeed(player);
+                horizontal = Math.max(horizontalDistance(state.lastPos, pos), Math.sqrt(vel.x * vel.x + vel.z * vel.z));
                 if (!graceAir && horizontal > maxAllowed) {
                     Vec3 target = state.lastSupportPos != null ? state.lastSupportPos : pos;
                     rubberBand(player, state, target, "air_speed", horizontal, maxAllowed);
@@ -437,6 +457,7 @@ public final class AntiFlyFabric implements ModInitializer {
                 ? horizontalDistance(state.lastPos, pos)
                 : Math.sqrt(vel.x * vel.x + vel.z * vel.z);
             double maxUp = maxAirVertical(player);
+            sendDebugActionBar(player, state, "AIR", horizontal, deltaY, maxAllowed, maxUp);
             if (!graceAir && deltaY > maxUp) {
                 Vec3 target = state.lastSupportPos != null ? state.lastSupportPos : pos;
                 rubberBand(player, state, target, "air_vertical", deltaY, maxUp);
@@ -810,6 +831,48 @@ public final class AntiFlyFabric implements ModInitializer {
         saveConfig();
         source.sendSuccess(() -> Component.literal("Alert mode set to " + mode), false);
         return 1;
+    }
+
+    private int setDebugMode(net.minecraft.commands.CommandSourceStack source, boolean enabled) {
+        ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            source.sendFailure(Component.literal("Usage: /antifly debug <on|off>"));
+            return 0;
+        }
+        if (enabled) {
+            debug.add(player.getUUID());
+            source.sendSuccess(() -> Component.literal("AntiFly action-bar debug enabled."), false);
+        } else {
+            debug.remove(player.getUUID());
+            source.sendSuccess(() -> Component.literal("AntiFly action-bar debug disabled."), false);
+        }
+        return 1;
+    }
+
+    private boolean isDebug(ServerPlayer player) {
+        return debug.contains(player.getUUID());
+    }
+
+    private void sendDebugActionBar(ServerPlayer player, PlayerState state, String mode,
+                                    double horizontal, double deltaY, double hLimit, double vLimit) {
+        if (!isDebug(player)) {
+            return;
+        }
+        String text = String.format(
+            "%s | h=%.3f/%.3f dy=%.3f/%.3f | buf[h=%.2f v=%.2f hov=%.2f ak=%.2f e=%.2f] | noFall=%s antiKick=%d/%d",
+            mode,
+            horizontal, hLimit,
+            deltaY, vLimit,
+            state.airHorizontalBuffer,
+            state.airVerticalBuffer,
+            state.hoverBuffer,
+            state.antiKickBuffer,
+            state.elytraMovementBuffer,
+            config.noFallDetectionEnabled,
+            state.airSessionTicks,
+            config.antiKickWindowTicks
+        );
+        player.displayClientMessage(Component.literal(text), true);
     }
 
     private boolean isAlertConsole() {
@@ -1298,6 +1361,11 @@ public final class AntiFlyFabric implements ModInitializer {
         Vec3 lastGroundPos;
         Vec3 lastSupportPos;
         Vec3 lastPos;
+        double airHorizontalBuffer;
+        double airVerticalBuffer;
+        double hoverBuffer;
+        double antiKickBuffer;
+        double elytraMovementBuffer;
         int airTicks;
         int airNonFallTicks;
         int airSessionTicks;
