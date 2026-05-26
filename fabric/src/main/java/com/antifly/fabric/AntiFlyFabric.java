@@ -872,7 +872,7 @@ public final class AntiFlyFabric implements ModInitializer {
             state.airSessionTicks,
             config.antiKickWindowTicks
         );
-        player.displayClientMessage(Component.literal(text), true);
+        player.sendSystemMessage(Component.literal(text));
     }
 
     private boolean isAlertConsole() {

@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version '1.7.2'
+    id 'net.fabricmc.fabric-loom' version '1.14.10'
 }
 
 base {
@@ -10,9 +10,8 @@ def commonProject = project(':common')
 
 dependencies {
     minecraft "com.mojang:minecraft:${fabric_minecraft_version}"
-    mappings loom.officialMojangMappings()
-    modImplementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
+    implementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
     implementation commonProject
 }
 
@@ -30,16 +29,15 @@ tasks.processResources {
     }
 }
 
-tasks.named('remapJar').configure {
+tasks.named('jar').configure {
     dependsOn(commonProject.tasks.named('classes'))
     from(commonProject.sourceSets.main.output)
 }
 
-tasks.named('remapSourcesJar').configure {
-    from(commonProject.sourceSets.main.output)
-}
-
 java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
     withSourcesJar()
 }
 
