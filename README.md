@@ -13,7 +13,7 @@ AntiFly is not a full anti-cheat. It focuses on flight and movement abuse with l
 
 ## Platforms
 - Paper: 1.21.x -> 26.1.2
-- Fabric: 1.21.11 -> 26.1.2 (Fabric Loader 0.18.1+, Fabric API 0.141.1+1.21.11)
+- Fabric: 26.1.2 (Fabric API 0.146.1)
 
 ## Build
 ```bash
