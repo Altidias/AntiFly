@@ -23,7 +23,9 @@ public final class AntiFlyCommand implements CommandExecutor, TabCompleter {
         "hoverBufferLimit", "noFallDetectionEnabled", "airNonFallTicksLimit", "antiKickWindowTicks",
         "antiKickMinDescent", "setbackCooldownMs", "elytraEnabled", "elytraBoostGraceTicks",
         "elytraStallTicks", "elytraMovementBufferLimit", "elytraDurabilityCheckEnabled",
-        "elytraMaxRocketHorizontal", "elytraMaxRocketUp", "elytraNoRocketSustainableHorizontal", "elytraMaxNoRocketUp"
+        "elytraMaxRocketHorizontal", "elytraMaxRocketUp", "elytraNoRocketSustainableHorizontal", "elytraMaxNoRocketUp",
+        "elytraBanned", "airChecksEnabled", "groundChecksEnabled", "waterChecksEnabled",
+        "vehicleChecksEnabled", "spearLungeGraceTicks"
     );
     private static final List<String> SET_ALIASES = List.of(
         "groundSpeed", "groundSpeedWalking", "groundSpeedMounted",
@@ -36,7 +38,9 @@ public final class AntiFlyCommand implements CommandExecutor, TabCompleter {
         "setback_cooldown_ms", "elytra_enabled", "elytra_boost_grace_ticks",
         "elytra_stall_ticks", "elytra_movement_buffer_limit", "elytra_durability_check_enabled",
         "elytra_max_rocket_horizontal", "elytra_max_rocket_up",
-        "elytra_no_rocket_sustainable_horizontal", "elytra_max_no_rocket_up"
+        "elytra_no_rocket_sustainable_horizontal", "elytra_max_no_rocket_up",
+        "elytra_banned", "ban_elytra", "air_checks_enabled", "ground_checks_enabled",
+        "water_checks_enabled", "vehicle_checks_enabled", "spear_lunge_grace_ticks"
     );
 
     private final AntiFlyPlugin plugin;
@@ -94,6 +98,11 @@ public final class AntiFlyCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(ChatColor.GOLD + "AntiFly Status");
                 sender.sendMessage(ChatColor.GRAY + "State: "
                     + (plugin.isAntiFlyEnabled() ? ChatColor.GREEN + "ENABLED" : ChatColor.RED + "DISABLED"));
+                sender.sendMessage(ChatColor.AQUA + "Checks");
+                sender.sendMessage(ChatColor.GRAY + "  airChecksEnabled=" + ChatColor.WHITE + s.airChecksEnabled
+                    + ChatColor.GRAY + "  groundChecksEnabled=" + ChatColor.WHITE + s.groundChecksEnabled);
+                sender.sendMessage(ChatColor.GRAY + "  waterChecksEnabled=" + ChatColor.WHITE + s.waterChecksEnabled
+                    + ChatColor.GRAY + "  vehicleChecksEnabled=" + ChatColor.WHITE + s.vehicleChecksEnabled);
 
                 sender.sendMessage(ChatColor.AQUA + "Ground / Fluid");
                 sender.sendMessage(ChatColor.GRAY + "  groundWalkMax=" + ChatColor.WHITE + s.groundWalkMax
@@ -119,6 +128,7 @@ public final class AntiFlyCommand implements CommandExecutor, TabCompleter {
 
                 sender.sendMessage(ChatColor.AQUA + "Elytra");
                 sender.sendMessage(ChatColor.GRAY + "  enabled=" + ChatColor.WHITE + s.elytraEnabled
+                    + ChatColor.GRAY + "  banned=" + ChatColor.WHITE + s.elytraBanned
                     + ChatColor.GRAY + "  boostGraceTicks=" + ChatColor.WHITE + s.elytraBoostGraceTicks);
                 sender.sendMessage(ChatColor.GRAY + "  stallTicks=" + ChatColor.WHITE + s.elytraStallTicks
                     + ChatColor.GRAY + "  movementBufferLimit=" + ChatColor.WHITE + s.elytraMovementBufferLimit);
@@ -127,6 +137,8 @@ public final class AntiFlyCommand implements CommandExecutor, TabCompleter {
                     + ChatColor.GRAY + "  maxRocketUp=" + ChatColor.WHITE + s.elytraMaxRocketUp);
                 sender.sendMessage(ChatColor.GRAY + "  noRocketSustainableHorizontal=" + ChatColor.WHITE + s.elytraNoRocketSustainableHorizontal
                     + ChatColor.GRAY + "  maxNoRocketUp=" + ChatColor.WHITE + s.elytraMaxNoRocketUp);
+                sender.sendMessage(ChatColor.AQUA + "Spear");
+                sender.sendMessage(ChatColor.GRAY + "  lungeGraceTicks=" + ChatColor.WHITE + s.spearLungeGraceTicks);
                 plugin.checkModrinthVersion(sender);
                 return true;
             }
@@ -342,6 +354,12 @@ public final class AntiFlyCommand implements CommandExecutor, TabCompleter {
             case "elytraMaxRocketUp" -> String.valueOf(s.elytraMaxRocketUp);
             case "elytraNoRocketSustainableHorizontal" -> String.valueOf(s.elytraNoRocketSustainableHorizontal);
             case "elytraMaxNoRocketUp" -> String.valueOf(s.elytraMaxNoRocketUp);
+            case "elytraBanned" -> String.valueOf(s.elytraBanned);
+            case "airChecksEnabled" -> String.valueOf(s.airChecksEnabled);
+            case "groundChecksEnabled" -> String.valueOf(s.groundChecksEnabled);
+            case "waterChecksEnabled" -> String.valueOf(s.waterChecksEnabled);
+            case "vehicleChecksEnabled" -> String.valueOf(s.vehicleChecksEnabled);
+            case "spearLungeGraceTicks" -> String.valueOf(s.spearLungeGraceTicks);
             default -> null;
         };
     }

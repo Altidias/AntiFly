@@ -33,6 +33,7 @@ import com.mojang.brigadier.arguments.DoubleArgumentType;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
@@ -151,6 +152,12 @@ public final class AntiFlyFabric implements ModInitializer {
                         + " stallTicks=" + config.elytraStallTicks
                         + " movementBufferLimit=" + config.elytraMovementBufferLimit
                         + " durabilityCheckEnabled=" + config.elytraDurabilityCheckEnabled), false);
+                    ctx.getSource().sendSuccess(() -> Component.literal("Checks: air=" + config.airChecksEnabled
+                        + " ground=" + config.groundChecksEnabled
+                        + " water=" + config.waterChecksEnabled
+                        + " vehicle=" + config.vehicleChecksEnabled), false);
+                    ctx.getSource().sendSuccess(() -> Component.literal("Elytra ban: " + config.elytraBanned
+                        + " | Spear: lungeGraceTicks=" + config.spearLungeGraceTicks), false);
                     checkModrinthVersion(ctx.getSource());
                     return 1;
                 }))
@@ -250,7 +257,14 @@ public final class AntiFlyFabric implements ModInitializer {
                     .then(settingNode("elytraStallTicks"))
                     .then(settingNode("elytraSlowdownMinSpeed"))
                     .then(settingNode("elytraSlowdownMinScale"))
-                    .then(settingNode("elytraSlowdownGraceTicks")))
+                    .then(settingNode("elytraSlowdownGraceTicks"))
+                    .then(settingNode("elytraBanned"))
+                    .then(settingNode("ban_elytra"))
+                    .then(settingNode("airChecksEnabled"))
+                    .then(settingNode("groundChecksEnabled"))
+                    .then(settingNode("waterChecksEnabled"))
+                    .then(settingNode("vehicleChecksEnabled"))
+                    .then(settingNode("spearLungeGraceTicks")))
             );
         });
 
@@ -281,6 +295,13 @@ public final class AntiFlyFabric implements ModInitializer {
             state.lastServerOnGround = serverOnGround;
             state.wasGliding = player.isFallFlying();
             return;
+        }
+
+        if (state.lungeGraceTicks > 0) {
+            state.lungeGraceTicks--;
+            state.lungeAllowance = state.lungeGraceTicks == 0
+                ? 0.0
+                : state.lungeAllowance * AntiFlyConstants.SPEAR_LUNGE_ALLOWANCE_DECAY;
         }
 
         boolean inFluid = isInFluid(player);
@@ -316,6 +337,14 @@ public final class AntiFlyFabric implements ModInitializer {
             state.vehicleGraceTicks = 20;
         }
         state.wasInVehicle = inVehicle;
+
+        if (inVehicle && !config.vehicleChecksEnabled) {
+            updateSupport(state, serverOnGround, inFluid, pos);
+            state.lastPos = pos;
+            state.lastServerOnGround = serverOnGround;
+            state.wasGliding = false;
+            return;
+        }
 
         if (inVehicle && state.vehicleGraceTicks > 0) {
             state.vehicleGraceTicks--;
@@ -376,6 +405,19 @@ public final class AntiFlyFabric implements ModInitializer {
         }
 
         if (isGliding) {
+            if (config.elytraBanned) {
+                boolean canNotify = System.currentTimeMillis() - state.lastRubberBandAtMs > LOG_COOLDOWN_MS;
+                player.stopFallFlying();
+                Vec3 target = state.lastSupportPos != null ? state.lastSupportPos
+                    : state.lastGroundPos != null ? state.lastGroundPos
+                    : pos;
+                rubberBand(player, state, target, "elytra_banned", 1.0, 0.0);
+                if (canNotify) {
+                    player.sendSystemMessage(Component.literal(config.elytraBannedMessage));
+                }
+                state.wasGliding = false;
+                return;
+            }
             if (!handleGlide(player, state, pos, serverOnGround, inFluid, inVehicle)) {
                 state.wasGliding = false;
                 return;
@@ -391,7 +433,7 @@ public final class AntiFlyFabric implements ModInitializer {
         }
 
         if (trustedGround) {
-            if (state.lastPos != null) {
+            if (state.lastPos != null && config.groundChecksEnabled) {
                 state.groundSpoofTicks = 0;
                 Vec3 vel = player.getDeltaMovement();
                 double deltaY = pos.y - state.lastPos.y;
@@ -399,6 +441,10 @@ public final class AntiFlyFabric implements ModInitializer {
                 double maxAllowed = maxGroundSpeed(player);
                 if (deltaY > 0.02 || vel.y > 0.05) {
                     maxAllowed *= 1.5;
+                }
+                maybeStartLungeGrace(player, state, horizontal, maxAllowed);
+                if (state.lungeGraceTicks > 0) {
+                    maxAllowed += state.lungeAllowance;
                 }
                 sendDebugActionBar(player, state, "GROUND", horizontal, deltaY, maxAllowed, 0.0);
                 if (state.glideGroundGraceTicks <= 0 && horizontal > maxAllowed) {
@@ -420,14 +466,14 @@ public final class AntiFlyFabric implements ModInitializer {
             deltaY = Math.max(deltaY, vel.y);
             double maxUp = maxWaterVertical(player);
             sendDebugActionBar(player, state, "FLUID", horizontal, deltaY, maxAllowed, maxUp);
-            if (horizontal > maxAllowed) {
+            if (config.waterChecksEnabled && horizontal > maxAllowed) {
                 Vec3 target = state.lastSupportPos != null ? state.lastSupportPos : pos;
                 rubberBand(player, state, target, "water_speed", horizontal, maxAllowed);
                 state.lastPos = pos;
                 state.wasGliding = false;
                 return;
             }
-            if (deltaY > maxUp) {
+            if (config.waterChecksEnabled && deltaY > maxUp) {
                 Vec3 target = state.lastSupportPos != null ? state.lastSupportPos : pos;
                 rubberBand(player, state, target, "water_vertical", deltaY, maxUp);
                 state.lastPos = pos;
@@ -436,6 +482,18 @@ public final class AntiFlyFabric implements ModInitializer {
             }
             updateSupport(state, false, true, pos);
         } else if (!inFluid) {
+            if (!config.airChecksEnabled) {
+                state.airTicks = 0;
+                state.airNonFallTicks = 0;
+                state.airSessionTicks = 0;
+                state.airSessionDescent = 0.0;
+                state.hoverTicks = 0;
+                state.voidTicks = 0;
+                state.lastPos = pos;
+                state.lastServerOnGround = serverOnGround;
+                state.wasGliding = false;
+                return;
+            }
             state.airTicks++;
             boolean graceAir = state.airTicks <= 4;
             double horizontal = 0.0;
@@ -443,6 +501,10 @@ public final class AntiFlyFabric implements ModInitializer {
             if (state.lastPos != null) {
                 Vec3 vel = player.getDeltaMovement();
                 horizontal = Math.max(horizontalDistance(state.lastPos, pos), Math.sqrt(vel.x * vel.x + vel.z * vel.z));
+                maybeStartLungeGrace(player, state, horizontal, maxAllowed);
+                if (state.lungeGraceTicks > 0) {
+                    maxAllowed += state.lungeAllowance;
+                }
                 if (!graceAir && horizontal > maxAllowed) {
                     Vec3 target = state.lastSupportPos != null ? state.lastSupportPos : pos;
                     rubberBand(player, state, target, "air_speed", horizontal, maxAllowed);
@@ -610,6 +672,45 @@ public final class AntiFlyFabric implements ModInitializer {
             max *= 1.0 + (0.1 * (jump.getAmplifier() + 1));
         }
         return max;
+    }
+
+    private boolean isSpear(ItemStack stack) {
+        var id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem());
+        return id.getPath().equals("spear") || id.getPath().endsWith("_spear");
+    }
+
+    private int heldLungeLevel(ServerPlayer player) {
+        ItemStack main = player.getMainHandItem();
+        ItemStack off = player.getOffhandItem();
+        boolean mainSpear = isSpear(main);
+        boolean offSpear = isSpear(off);
+        if (!mainSpear && !offSpear) {
+            return 0;
+        }
+        var lungeHolder = player.level().registryAccess()
+            .lookupOrThrow(Registries.ENCHANTMENT)
+            .getOrThrow(Enchantments.LUNGE);
+        int level = 0;
+        if (mainSpear) {
+            level = EnchantmentHelper.getItemEnchantmentLevel(lungeHolder, main);
+        }
+        if (offSpear) {
+            level = Math.max(level, EnchantmentHelper.getItemEnchantmentLevel(lungeHolder, off));
+        }
+        return level;
+    }
+
+    private void maybeStartLungeGrace(ServerPlayer player, PlayerState state, double observedHorizontal, double normalMax) {
+        if (state.lungeGraceTicks > 0 || observedHorizontal <= normalMax) {
+            return;
+        }
+        int level = heldLungeLevel(player);
+        if (level <= 0) {
+            return;
+        }
+        state.lungeGraceTicks = config.spearLungeGraceTicks;
+        state.lungeAllowance = AntiFlyConstants.SPEAR_LUNGE_SPEED_PER_LEVEL * level
+            + AntiFlyConstants.SPEAR_LUNGE_ALLOWANCE_BUFFER;
     }
 
     private boolean handleGlide(ServerPlayer player, PlayerState state, Vec3 pos,
@@ -930,6 +1031,8 @@ public final class AntiFlyFabric implements ModInitializer {
         state.vehicleFallTicks = 0;
         state.vehicleFallHorizontalDistance = 0.0;
         state.wasInVehicle = false;
+        state.lungeGraceTicks = 0;
+        state.lungeAllowance = 0.0;
         if (pos != null) {
             state.lastGroundPos = pos;
             state.lastSupportPos = pos;
@@ -1002,6 +1105,12 @@ public final class AntiFlyFabric implements ModInitializer {
             case "elytraSlowdownMinSpeed" -> config.elytraSlowdownMinSpeed = value;
             case "elytraSlowdownMinScale" -> config.elytraSlowdownMinScale = value;
             case "elytraSlowdownGraceTicks" -> config.elytraSlowdownGraceTicks = (int) Math.round(value);
+            case "elytraBanned" -> config.elytraBanned = value > 0.5;
+            case "airChecksEnabled" -> config.airChecksEnabled = value > 0.5;
+            case "groundChecksEnabled" -> config.groundChecksEnabled = value > 0.5;
+            case "waterChecksEnabled" -> config.waterChecksEnabled = value > 0.5;
+            case "vehicleChecksEnabled" -> config.vehicleChecksEnabled = value > 0.5;
+            case "spearLungeGraceTicks" -> config.spearLungeGraceTicks = (int) Math.round(value);
             default -> {
                 source.sendFailure(Component.literal("Unknown key."));
                 return 0;
@@ -1069,6 +1178,12 @@ public final class AntiFlyFabric implements ModInitializer {
             case "elytraSlowdownMinSpeed" -> String.valueOf(config.elytraSlowdownMinSpeed);
             case "elytraSlowdownMinScale" -> String.valueOf(config.elytraSlowdownMinScale);
             case "elytraSlowdownGraceTicks" -> String.valueOf(config.elytraSlowdownGraceTicks);
+            case "elytraBanned" -> String.valueOf(config.elytraBanned);
+            case "airChecksEnabled" -> String.valueOf(config.airChecksEnabled);
+            case "groundChecksEnabled" -> String.valueOf(config.groundChecksEnabled);
+            case "waterChecksEnabled" -> String.valueOf(config.waterChecksEnabled);
+            case "vehicleChecksEnabled" -> String.valueOf(config.vehicleChecksEnabled);
+            case "spearLungeGraceTicks" -> String.valueOf(config.spearLungeGraceTicks);
             default -> null;
         };
     }
@@ -1111,7 +1226,13 @@ public final class AntiFlyFabric implements ModInitializer {
         "elytraStallTicks",
         "elytraSlowdownMinSpeed",
         "elytraSlowdownMinScale",
-        "elytraSlowdownGraceTicks"
+        "elytraSlowdownGraceTicks",
+        "elytraBanned",
+        "airChecksEnabled",
+        "groundChecksEnabled",
+        "waterChecksEnabled",
+        "vehicleChecksEnabled",
+        "spearLungeGraceTicks"
     );
     private static final java.util.List<String> SET_ALIASES = java.util.List.of(
         "groundSpeed", "groundSpeedWalking", "groundSpeedMounted",
@@ -1129,6 +1250,7 @@ public final class AntiFlyFabric implements ModInitializer {
             case "maxAirVertical" -> "airVertical";
             case "airNonFallTicksLimit" -> "airNonFallTicks";
             case "elytraMovementLimit" -> "elytraMovementBufferLimit";
+            case "elytra_banned", "ban_elytra", "banElytra" -> "elytraBanned";
             default -> key;
         };
     }
@@ -1322,6 +1444,13 @@ public final class AntiFlyFabric implements ModInitializer {
         double elytraSlowdownMinSpeed = AntiFlyConstants.ELYTRA_SLOWDOWN_MIN_SPEED;
         double elytraSlowdownMinScale = AntiFlyConstants.ELYTRA_SLOWDOWN_MIN_SCALE;
         int elytraSlowdownGraceTicks = AntiFlyConstants.ELYTRA_SLOWDOWN_GRACE_TICKS;
+        boolean elytraBanned = false;
+        String elytraBannedMessage = "Elytra is disabled on this server.";
+        boolean airChecksEnabled = true;
+        boolean groundChecksEnabled = true;
+        boolean waterChecksEnabled = true;
+        boolean vehicleChecksEnabled = true;
+        int spearLungeGraceTicks = AntiFlyConstants.DEFAULT_SPEAR_LUNGE_GRACE_TICKS;
         java.util.List<String> exempt = java.util.List.of();
 
         private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -1384,6 +1513,8 @@ public final class AntiFlyFabric implements ModInitializer {
         int vehicleFallTicks;
         double vehicleFallHorizontalDistance;
         boolean wasInVehicle;
+        int lungeGraceTicks;
+        double lungeAllowance;
         long lastRubberBandAtMs;
     }
 }

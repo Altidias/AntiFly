@@ -46,6 +46,10 @@ public final class AntiFlyConstants {
     public static final double AIR_BUFFER = 0.15;
     public static final double BASE_AIR_VERTICAL_MAX = 0.55;
     public static final double AIR_VERTICAL_BUFFER = 0.10;
+    public static final double SPEAR_LUNGE_SPEED_PER_LEVEL = 0.458;
+    public static final double SPEAR_LUNGE_ALLOWANCE_BUFFER = 0.15;
+    public static final double SPEAR_LUNGE_ALLOWANCE_DECAY = 0.92;
+    public static final int DEFAULT_SPEAR_LUNGE_GRACE_TICKS = 30;
 
     private AntiFlyConstants() {
     }

@@ -25,6 +25,11 @@ public final class AntiFlyPlugin extends JavaPlugin {
     public void onEnable() {
         loadConfigValues();
         Bukkit.getPluginManager().registerEvents(new AntiFlyListener(this), this);
+        if (LungeListener.tryRegister(this)) {
+            getLogger().info("Spear lunge grace active (EntityLungeEvent available).");
+        } else {
+            getLogger().info("EntityLungeEvent not available on this server version; spear lunge grace inactive.");
+        }
         getCommand("antifly").setExecutor(new AntiFlyCommand(this));
         getCommand("antifly").setTabCompleter(new AntiFlyCommand(this));
         checkModrinthVersionAndAlertOps();
@@ -139,6 +144,12 @@ public final class AntiFlyPlugin extends JavaPlugin {
             case "elytraMaxRocketUp" -> settings.elytraMaxRocketUp = value;
             case "elytraNoRocketSustainableHorizontal" -> settings.elytraNoRocketSustainableHorizontal = value;
             case "elytraMaxNoRocketUp" -> settings.elytraMaxNoRocketUp = value;
+            case "elytraBanned" -> settings.elytraBanned = value > 0.5;
+            case "airChecksEnabled" -> settings.airChecksEnabled = value > 0.5;
+            case "groundChecksEnabled" -> settings.groundChecksEnabled = value > 0.5;
+            case "waterChecksEnabled" -> settings.waterChecksEnabled = value > 0.5;
+            case "vehicleChecksEnabled" -> settings.vehicleChecksEnabled = value > 0.5;
+            case "spearLungeGraceTicks" -> settings.spearLungeGraceTicks = (int) Math.round(value);
             default -> {
                 return;
             }
@@ -172,6 +183,10 @@ public final class AntiFlyPlugin extends JavaPlugin {
         config.addDefault("antiFly.setbackCooldownMs", 500L);
         config.addDefault("antiFly.noFallDetectionEnabled", true);
         config.addDefault("antiFly.alertMode", "both");
+        config.addDefault("antiFly.airChecksEnabled", true);
+        config.addDefault("antiFly.groundChecksEnabled", true);
+        config.addDefault("antiFly.waterChecksEnabled", true);
+        config.addDefault("antiFly.vehicleChecksEnabled", true);
 
         config.addDefault("elytra.enabled", true);
         config.addDefault("elytra.boostGraceTicks", 80);
@@ -194,6 +209,9 @@ public final class AntiFlyPlugin extends JavaPlugin {
         config.addDefault("elytra.durabilityUnbreakingMultiplier", 2.5);
         config.addDefault("elytra.durabilitySuspicionLimit", 3);
         config.addDefault("elytra.requireMovementSuspicionForDurabilityPunish", true);
+        config.addDefault("elytra.banned", false);
+        config.addDefault("elytra.bannedMessage", "Elytra is disabled on this server.");
+        config.addDefault("spear.lungeGraceTicks", AntiFlyConstants.DEFAULT_SPEAR_LUNGE_GRACE_TICKS);
 
         config.addDefault("limits.groundWalking", AntiFlyConstants.DEFAULT_GROUND_WALK_MAX);
         config.addDefault("limits.groundMounted", AntiFlyConstants.DEFAULT_GROUND_MOUNT_MAX);
@@ -229,6 +247,10 @@ public final class AntiFlyPlugin extends JavaPlugin {
         settings.setbackCooldownMs = config.getLong("antiFly.setbackCooldownMs", 500L);
         settings.noFallDetectionEnabled = config.getBoolean("antiFly.noFallDetectionEnabled", true);
         settings.alertMode = AlertMode.fromString(config.getString("antiFly.alertMode", "both"), AlertMode.BOTH);
+        settings.airChecksEnabled = config.getBoolean("antiFly.airChecksEnabled", true);
+        settings.groundChecksEnabled = config.getBoolean("antiFly.groundChecksEnabled", true);
+        settings.waterChecksEnabled = config.getBoolean("antiFly.waterChecksEnabled", true);
+        settings.vehicleChecksEnabled = config.getBoolean("antiFly.vehicleChecksEnabled", true);
 
         settings.elytraEnabled = config.getBoolean("elytra.enabled", true);
         settings.elytraBoostGraceTicks = config.getInt("elytra.boostGraceTicks", 80);
@@ -251,6 +273,9 @@ public final class AntiFlyPlugin extends JavaPlugin {
         settings.elytraDurabilityUnbreakingMultiplier = config.getDouble("elytra.durabilityUnbreakingMultiplier", 2.5);
         settings.elytraDurabilitySuspicionLimit = config.getInt("elytra.durabilitySuspicionLimit", 3);
         settings.elytraRequireMovementSuspicionForDurabilityPunish = config.getBoolean("elytra.requireMovementSuspicionForDurabilityPunish", true);
+        settings.elytraBanned = config.getBoolean("elytra.banned", false);
+        settings.elytraBannedMessage = config.getString("elytra.bannedMessage", "Elytra is disabled on this server.");
+        settings.spearLungeGraceTicks = config.getInt("spear.lungeGraceTicks", AntiFlyConstants.DEFAULT_SPEAR_LUNGE_GRACE_TICKS);
 
         settings.modrinthProjectSlug = config.getString("modrinth.projectSlug", "antiflight");
 
@@ -281,6 +306,10 @@ public final class AntiFlyPlugin extends JavaPlugin {
         config.set("antiFly.antiKickWindowTicks", settings.antiKickWindowTicks);
         config.set("antiFly.antiKickMinDescent", settings.antiKickMinDescent);
         config.set("antiFly.setbackCooldownMs", settings.setbackCooldownMs);
+        config.set("antiFly.airChecksEnabled", settings.airChecksEnabled);
+        config.set("antiFly.groundChecksEnabled", settings.groundChecksEnabled);
+        config.set("antiFly.waterChecksEnabled", settings.waterChecksEnabled);
+        config.set("antiFly.vehicleChecksEnabled", settings.vehicleChecksEnabled);
 
         config.set("elytra.enabled", settings.elytraEnabled);
         config.set("elytra.boostGraceTicks", settings.elytraBoostGraceTicks);
@@ -291,6 +320,8 @@ public final class AntiFlyPlugin extends JavaPlugin {
         config.set("elytra.maxRocketUp", settings.elytraMaxRocketUp);
         config.set("elytra.noRocketSustainableHorizontal", settings.elytraNoRocketSustainableHorizontal);
         config.set("elytra.maxNoRocketUp", settings.elytraMaxNoRocketUp);
+        config.set("elytra.banned", settings.elytraBanned);
+        config.set("spear.lungeGraceTicks", settings.spearLungeGraceTicks);
     }
 
     static String normalizeSettingKey(String key) {
@@ -327,6 +358,12 @@ public final class AntiFlyPlugin extends JavaPlugin {
             case "elytra_max_rocket_up" -> "elytraMaxRocketUp";
             case "elytra_no_rocket_sustainable_horizontal" -> "elytraNoRocketSustainableHorizontal";
             case "elytra_max_no_rocket_up" -> "elytraMaxNoRocketUp";
+            case "elytra_banned", "ban_elytra", "banElytra" -> "elytraBanned";
+            case "air_checks_enabled" -> "airChecksEnabled";
+            case "ground_checks_enabled" -> "groundChecksEnabled";
+            case "water_checks_enabled" -> "waterChecksEnabled";
+            case "vehicle_checks_enabled" -> "vehicleChecksEnabled";
+            case "spear_lunge_grace_ticks" -> "spearLungeGraceTicks";
             default -> key;
         };
     }
@@ -404,6 +441,14 @@ public final class AntiFlyPlugin extends JavaPlugin {
         double elytraDurabilityUnbreakingMultiplier;
         int elytraDurabilitySuspicionLimit;
         boolean elytraRequireMovementSuspicionForDurabilityPunish;
+
+        boolean elytraBanned;
+        String elytraBannedMessage;
+        boolean airChecksEnabled;
+        boolean groundChecksEnabled;
+        boolean waterChecksEnabled;
+        boolean vehicleChecksEnabled;
+        int spearLungeGraceTicks;
 
         String modrinthProjectSlug;
     }
@@ -485,6 +530,9 @@ public final class AntiFlyPlugin extends JavaPlugin {
         int elytraNoDurabilityDropWindows;
         int lastElytraDurabilityDropTick;
         boolean durabilitySuspicious;
+
+        int lungeGraceTicks;
+        double lungeAllowance;
 
         int tick;
         boolean lastInFluid;

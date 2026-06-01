@@ -1,5 +1,6 @@
 package com.antifly.paper;
 
+import com.antifly.common.AntiFlyConstants;
 import java.util.EnumSet;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
@@ -59,6 +60,13 @@ public final class AntiFlyListener implements Listener {
         AntiFlyPlugin.Settings settings = plugin.getSettings();
         state.tick++;
 
+        if (state.lungeGraceTicks > 0) {
+            state.lungeGraceTicks--;
+            state.lungeAllowance = state.lungeGraceTicks == 0
+                ? 0.0
+                : state.lungeAllowance * AntiFlyConstants.SPEAR_LUNGE_ALLOWANCE_DECAY;
+        }
+
         if (player.isDead()) {
             resetState(state, null);
             return;
@@ -103,6 +111,11 @@ public final class AntiFlyListener implements Listener {
         }
 
         if (player.isGliding()) {
+            if (settings.elytraBanned) {
+                enforceElytraBan(player, state);
+                state.lastPos = to.clone();
+                return;
+            }
             if (!handleElytraMovement(player, state, from, to, nearGround, inFluid, inVehicle)) {
                 return;
             }
@@ -126,7 +139,7 @@ public final class AntiFlyListener implements Listener {
         state.lastPos = to.clone();
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onToggleGlide(EntityToggleGlideEvent event) {
         if (!(event.getEntity() instanceof Player player)) {
             return;
@@ -134,6 +147,11 @@ public final class AntiFlyListener implements Listener {
         AntiFlyPlugin.PlayerState state = plugin.getState(player);
         AntiFlyPlugin.Settings settings = plugin.getSettings();
         if (event.isGliding()) {
+            if (plugin.isAntiFlyEnabled() && settings.elytraBanned && !isExempt(player)) {
+                event.setCancelled(true);
+                enforceElytraBan(player, state);
+                return;
+            }
             state.wasGliding = true;
             state.glideTicks = 0;
             state.glideToggleGraceTicks = settings.elytraToggleGraceTicks;
@@ -180,8 +198,16 @@ public final class AntiFlyListener implements Listener {
     }
 
     private void handleGroundMovement(Player player, AntiFlyPlugin.PlayerState state, Location from, Location to) {
+        if (!plugin.getSettings().groundChecksEnabled) {
+            updateSupport(state, true, false, to);
+            resetAirFlags(state);
+            return;
+        }
         double horizontal = horizontalDistance(from, to);
         double maxAllowed = maxGroundSpeed(player);
+        if (state.lungeGraceTicks > 0) {
+            maxAllowed += state.lungeAllowance;
+        }
         double groundTolerance = 0.03;
         if (plugin.isDebug(player)) {
             sendDebugActionBar(player, state, "GROUND", horizontal, to.getY() - from.getY(), maxAllowed, 0.0);
@@ -195,6 +221,11 @@ public final class AntiFlyListener implements Listener {
     }
 
     private void handleFluidMovement(Player player, AntiFlyPlugin.PlayerState state, Location from, Location to) {
+        if (!plugin.getSettings().waterChecksEnabled) {
+            updateSupport(state, false, true, to);
+            resetAirFlags(state);
+            return;
+        }
         Vector vel = player.getVelocity();
         double horizontal = Math.max(horizontalDistance(from, to), Math.sqrt(vel.getX() * vel.getX() + vel.getZ() * vel.getZ()));
         double deltaY = Math.max(to.getY() - from.getY(), vel.getY());
@@ -215,6 +246,10 @@ public final class AntiFlyListener implements Listener {
 
     private void handleNormalAirMovement(Player player, AntiFlyPlugin.PlayerState state, Location from, Location to, boolean nearGround) {
         AntiFlyPlugin.Settings settings = plugin.getSettings();
+        if (!settings.airChecksEnabled) {
+            resetAirFlags(state);
+            return;
+        }
         Vector vel = player.getVelocity();
 
         state.airTicks++;
@@ -224,9 +259,11 @@ public final class AntiFlyListener implements Listener {
 
         double horizontal = Math.max(horizontalDistance(from, to), Math.sqrt(vel.getX() * vel.getX() + vel.getZ() * vel.getZ()));
         double deltaY = Math.max(to.getY() - from.getY(), vel.getY());
+        boolean lungeGrace = state.lungeGraceTicks > 0;
         boolean graceAir = state.airTicks <= settings.airGraceTicks || state.flightRevokeGraceTicks > 0;
+        double maxAirHorizontal = settings.maxAirHorizontal + (lungeGrace ? state.lungeAllowance : 0.0);
         if (plugin.isDebug(player)) {
-            sendDebugActionBar(player, state, "AIR", horizontal, deltaY, settings.maxAirHorizontal, settings.maxAirVertical);
+            sendDebugActionBar(player, state, "AIR", horizontal, deltaY, maxAirHorizontal, settings.maxAirVertical);
         }
 
         if (player.isOnGround() && !state.lastServerOnGround) {
@@ -237,8 +274,8 @@ public final class AntiFlyListener implements Listener {
             state.groundSpoofBuffer = decay(state.groundSpoofBuffer, settings.bufferDecay);
         }
 
-        if (!graceAir && horizontal > settings.maxAirHorizontal) {
-            state.airHorizontalBuffer += horizontal - settings.maxAirHorizontal;
+        if (!graceAir && horizontal > maxAirHorizontal) {
+            state.airHorizontalBuffer += horizontal - maxAirHorizontal;
         } else {
             state.airHorizontalBuffer = decay(state.airHorizontalBuffer, settings.bufferDecay);
         }
@@ -322,6 +359,10 @@ public final class AntiFlyListener implements Listener {
         Entity vehicle = player.getVehicle();
         if (vehicle == null) {
             return false;
+        }
+
+        if (!plugin.getSettings().vehicleChecksEnabled) {
+            return true;
         }
 
         if (state.airTicks == 0) {
@@ -711,6 +752,14 @@ public final class AntiFlyListener implements Listener {
         resetAirFlags(state);
     }
 
+    private void enforceElytraBan(Player player, AntiFlyPlugin.PlayerState state) {
+        boolean wasCoolingDown = isSetbackCoolingDown(state);
+        failElytra(player, state, "elytra_banned", 1.0, 0.0);
+        if (!wasCoolingDown) {
+            player.sendMessage(ChatColor.RED + plugin.getSettings().elytraBannedMessage);
+        }
+    }
+
     private boolean isSetbackCoolingDown(AntiFlyPlugin.PlayerState state) {
         long now = System.currentTimeMillis();
         return now - state.lastSetbackAtMs < plugin.getSettings().setbackCooldownMs;
@@ -769,6 +818,7 @@ public final class AntiFlyListener implements Listener {
             case "elytra_no_rocket_control_up" -> "elytraMaxNoRocketUp";
             case "elytra_motion", "elytra_durability_plus_motion" -> "elytraMovementBufferLimit";
             case "elytra_no_item" -> "elytraEnabled";
+            case "elytra_banned" -> "elytraBanned";
             default -> "-";
         };
     }
@@ -799,6 +849,8 @@ public final class AntiFlyListener implements Listener {
         state.groundSpoofTicks = 0;
         state.lastServerOnGround = false;
         state.lastClientOnGround = false;
+        state.lungeGraceTicks = 0;
+        state.lungeAllowance = 0.0;
         if (loc != null) {
             state.lastGround = loc.clone();
             state.lastSupport = loc.clone();

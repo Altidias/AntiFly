@@ -83,6 +83,12 @@ Requires moderator-level command permission.
 - `elytraMaxRocketUp`
 - `elytraNoRocketSustainableHorizontal`
 - `elytraMaxNoRocketUp`
+- `elytraBanned`
+- `airChecksEnabled`
+- `groundChecksEnabled`
+- `waterChecksEnabled`
+- `vehicleChecksEnabled`
+- `spearLungeGraceTicks`
 
 Legacy aliases kept for backward compatibility:
 - `groundSpeed`, `groundSpeedWalking`, `groundSpeedMounted`
@@ -94,6 +100,22 @@ Legacy aliases kept for backward compatibility:
 - Rocket-assisted glide is tracked separately from no-rocket glide.
 - No-rocket controlled upward/flat cruise behavior is treated as suspicious and can be blocked.
 - Rare fluid-exit and early-glide pull-up transitions are given short grace windows to reduce false positives.
+
+## Banning Elytra entirely
+
+`elytraBanned` blocks all elytra usage (legitimate or hacked) - separate from
+`elytraEnabled`, which only toggles elytra hack detection.
+
+To run AntiFly purely as an elytra ban with no other movement checks (no boat,
+swimming, sprinting, or spear-lunge false positives):
+
+```
+/antifly set elytraBanned 1
+/antifly set airChecksEnabled 0
+/antifly set groundChecksEnabled 0
+/antifly set waterChecksEnabled 0
+/antifly set vehicleChecksEnabled 0
+```
 
 ## Permissions (Paper)
 - `antifly.admin` (default: op)
